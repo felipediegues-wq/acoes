@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Ações - Dark Mode</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="sidebar">
+        <h2>Meus Investimentos</h2>
+        <ul>
+            <li><a href="#" onclick="mostrarAba('ativas')">Carteiras Ativas</a></li>
+            <li><a href="#" onclick="mostrarAba('favoritas')">Carteiras Favoritas</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1 id="titulo-pagina">Carteiras Ativas</h1>
+            <button onclick="carregarDados()" class="btn-refresh">Atualizar Cotações</button>
+        </div>
+
+        <!-- Seção Carteiras Ativas -->
+        <div id="aba-ativas" class="aba-conteudo ativa">
+            <table class="dark-table">
+                <thead>
+                    <tr>
+                        <th>Carteira</th>
+                        <th>Ticker</th>
+                        <th>Quant.</th>
+                        <th>Preço Médio</th>
+                        <th>Cotação Atual</th>
+                        <th>Dividendos</th>
+                        <th>Rentabilidade (%)</th>
+                    </tr>
+                </thead>
+                <tbody id="tb-ativas">
+                    <!-- Preenchido via JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Seção Carteiras Favoritas -->
+        <div id="aba-favoritas" class="aba-conteudo">
+            <table class="dark-table">
+                <thead>
+                    <tr>
+                        <th>Carteira</th>
+                        <th>Ticker</th>
+                        <th>Cotação Atual</th>
+                    </tr>
+                </thead>
+                <tbody id="tb-favoritas">
+                    <!-- Preenchido via JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
