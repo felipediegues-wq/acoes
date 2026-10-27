@@ -1,6 +1,8 @@
 const SUPABASE_URL = 'https://fjnyiizsgqzlfvbirxjs.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_kgtacUBF-Zu84LBgM6xG2w_b339h_eA';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// A variável passa a chamar-se 'clienteSupabase' para evitar conflitos
+const clienteSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function mostrarAba(aba) {
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.remove('ativa'));
@@ -17,7 +19,8 @@ async function buscarCotacaoReal(ticker) {
 }
 
 async function carregarDados() {
-    const { data: posicoes, error } = await supabase
+    // Utilizamos a nova variável 'clienteSupabase' para comunicar com a base de dados
+    const { data: posicoes, error } = await clienteSupabase
         .from('vw_posicao_atual')
         .select('*');
 
