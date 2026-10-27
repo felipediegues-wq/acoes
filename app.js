@@ -1,25 +1,39 @@
+// 1. Configuração do Supabase (com chaves atualizadas)
 const SUPABASE_URL = 'https://fjnyiizsgqzlfvbirxjs.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_kgtacUBF-Zu84LBgM6xG2w_b339h_eA';
-
-// A variável passa a chamar-se 'clienteSupabase' para evitar conflitos
 const clienteSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 2. Controle de Abas e Títulos
+const titulos = {
+    'ativas': 'Carteiras Ativas',
+    'favoritas': 'Carteiras Favoritas',
+    'nova-carteira': 'Criar Nova Carteira',
+    'nova-ordem': 'Lançar Ordem (Compra/Venda)'
+};
 
 function mostrarAba(aba) {
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.remove('ativa'));
     document.getElementById('aba-' + aba).classList.add('ativa');
-    document.getElementById('titulo-pagina').innerText = aba === 'ativas' ? 'Carteiras Ativas' : 'Carteiras Favoritas';
+    document.getElementById('titulo-pagina').innerText = titulos[aba];
+    
+    // Se abrir a tela de ordens, carrega a lista de carteiras no dropdown
+    if (aba === 'nova-ordem') {
+        carregarDropdownCarteiras();
+    }
 }
 
+// 3. Simulação de Cotação em Tempo Real (Substituir no futuro por API real)
 async function buscarCotacaoReal(ticker) {
     const mockPrecos = {
         'PETR4.SA': 38.50,
         'WEGE3.SA': 40.10
     };
+    // Retorna o preço de teste ou 10.00 como valor padrão
     return mockPrecos[ticker] || 10.00;
 }
 
+// 4. Carregar Dados na Tabela Principal
 async function carregarDados() {
-    // Utilizamos a nova variável 'clienteSupabase' para comunicar com a base de dados
     const { data: posicoes, error } = await clienteSupabase
         .from('vw_posicao_atual')
         .select('*');
@@ -66,29 +80,9 @@ async function carregarDados() {
     }
 }
 
-// --- NOVAS FUNÇÕES PARA CADASTRO ---
-
-// Mudar os títulos ao trocar de aba
-const titulos = {
-    'ativas': 'Carteiras Ativas',
-    'favoritas': 'Carteiras Favoritas',
-    'nova-carteira': 'Criar Nova Carteira',
-    'nova-ordem': 'Lançar Ordem (Compra/Venda)'
-};
-
-function mostrarAba(aba) {
-    document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.remove('ativa'));
-    document.getElementById('aba-' + aba).classList.add('ativa');
-    document.getElementById('titulo-pagina').innerText = titulos[aba];
-    
-    if (aba === 'nova-ordem') {
-        carregarDropdownCarteiras();
-    }
-}
-
-// Salvar Nova Carteira no Banco
+// 5. Salvar Nova Carteira
 async function salvarCarteira(event) {
-    event.preventDefault(); // Impede a página de recarregar
+    event.preventDefault(); 
     
     const nome = document.getElementById('cad-nome-carteira').value;
     const tipo = document.getElementById('cad-tipo-carteira').value;
@@ -105,7 +99,7 @@ async function salvarCarteira(event) {
     }
 }
 
-// Carregar as carteiras no Select da tela de Ordens
+// 6. Carregar Dropdown de Carteiras na tela de Ordens
 async function carregarDropdownCarteiras() {
     const { data, error } = await clienteSupabase.from('carteiras').select('*');
     const select = document.getElementById('ordem-carteira');
@@ -118,7 +112,7 @@ async function carregarDropdownCarteiras() {
     }
 }
 
-// Lançar Compra ou Venda
+// 7. Salvar Nova Ordem (Compra/Venda)
 async function salvarOrdem(event) {
     event.preventDefault();
 
@@ -129,7 +123,7 @@ async function salvarOrdem(event) {
     const preco = document.getElementById('ordem-preco').value;
     const data_transacao = document.getElementById('ordem-data').value;
 
-    // 1. Verifica se o Ativo já existe na carteira, se não, cria.
+    // A. Verifica se o Ativo já existe na carteira selecionada
     let { data: ativos, error: errAtivo } = await clienteSupabase
         .from('ativos')
         .select('id')
@@ -139,8 +133,9 @@ async function salvarOrdem(event) {
     let ativo_id;
 
     if (ativos && ativos.length > 0) {
-        ativo_id = ativos[0].id;
+        ativo_id = ativos[0].id; // Já existe, pega o ID
     } else {
+        // Não existe, cria o vínculo do ativo com a carteira primeiro
         const { data: novoAtivo, error: errNovo } = await clienteSupabase
             .from('ativos')
             .insert([{ carteira_id: carteira_id, ticker: ticker }])
@@ -153,7 +148,7 @@ async function salvarOrdem(event) {
         ativo_id = novoAtivo[0].id;
     }
 
-    // 2. Insere a transação
+    // B. Registra a transação (Ordem)
     const { error: errTransacao } = await clienteSupabase
         .from('transacoes')
         .insert([{ 
@@ -168,10 +163,14 @@ async function salvarOrdem(event) {
         alert('Erro ao registrar ordem: ' + errTransacao.message);
     } else {
         alert('Ordem registrada com sucesso!');
+        // Limpa os campos após o sucesso
         document.getElementById('ordem-quantidade').value = '';
         document.getElementById('ordem-preco').value = '';
-        carregarDados(); // Atualiza a tabela principal
+        document.getElementById('ordem-ticker').value = '';
+        // Atualiza os dados na tabela principal
+        carregarDados(); 
     }
 }
 
+// Inicia o carregamento dos dados ao abrir a página
 carregarDados();
