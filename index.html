@@ -11,21 +11,20 @@
 <body>
     <div class="sidebar">
         <h2>Meus Investimentos</h2>
-        <ul>
-            <li><a href="#" onclick="mostrarAba('ativas')">Carteiras Ativas</a></li>
-            <li><a href="#" onclick="mostrarAba('favoritas')">Carteiras Favoritas</a></li>
-        </ul>
+        <a href="#" onclick="mostrarAba('ativas')">Carteiras Ativas</a>
+        <a href="#" onclick="mostrarAba('favoritas')">Carteiras Favoritas</a>
+        <br><br>
+        <a href="#" onclick="mostrarAba('nova-carteira')">➕ Nova Carteira</a>
+        <a href="#" onclick="mostrarAba('nova-ordem')">🛒 Lançar Ordem</a>
     </div>
 
     <div class="main-content">
-        <div class="header">
-            <h1 id="titulo-pagina">Carteiras Ativas</h1>
-            <button onclick="carregarDados()" class="btn-refresh">Atualizar Cotações</button>
-        </div>
+        <h1 id="titulo-pagina">Carteiras Ativas</h1>
+        <button class="btn-atualizar" onclick="carregarDados()">Atualizar Cotações</button>
 
-        <!-- Seção Carteiras Ativas -->
+        <!-- ABA: CARTEIRAS ATIVAS -->
         <div id="aba-ativas" class="aba-conteudo ativa">
-            <table class="dark-table">
+            <table>
                 <thead>
                     <tr>
                         <th>Carteira</th>
@@ -37,15 +36,13 @@
                         <th>Rentabilidade (%)</th>
                     </tr>
                 </thead>
-                <tbody id="tb-ativas">
-                    <!-- Preenchido via JS -->
-                </tbody>
+                <tbody id="tb-ativas"></tbody>
             </table>
         </div>
 
-        <!-- Seção Carteiras Favoritas -->
+        <!-- ABA: CARTEIRAS FAVORITAS -->
         <div id="aba-favoritas" class="aba-conteudo">
-            <table class="dark-table">
+            <table>
                 <thead>
                     <tr>
                         <th>Carteira</th>
@@ -53,13 +50,62 @@
                         <th>Cotação Atual</th>
                     </tr>
                 </thead>
-                <tbody id="tb-favoritas">
-                    <!-- Preenchido via JS -->
-                </tbody>
+                <tbody id="tb-favoritas"></tbody>
             </table>
         </div>
-    </div>
 
+        <!-- ABA: NOVA CARTEIRA -->
+        <div id="aba-nova-carteira" class="aba-conteudo">
+            <form class="formulario" onsubmit="salvarCarteira(event)">
+                <div class="form-group">
+                    <label>Nome da Carteira:</label>
+                    <input type="text" id="cad-nome-carteira" required placeholder="Ex: Longo Prazo">
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Carteira:</label>
+                    <select id="cad-tipo-carteira" required>
+                        <option value="ATIVA">Ativa (Longo Prazo / Trade)</option>
+                        <option value="FAVORITA">Favorita (Apenas Acompanhamento)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-sucesso">Criar Carteira</button>
+            </form>
+        </div>
+
+        <!-- ABA: NOVA ORDEM (COMPRA/VENDA) -->
+        <div id="aba-nova-ordem" class="aba-conteudo">
+            <form class="formulario" onsubmit="salvarOrdem(event)">
+                <div class="form-group">
+                    <label>Selecionar Carteira:</label>
+                    <select id="ordem-carteira" required></select>
+                </div>
+                <div class="form-group">
+                    <label>Ativo (Ticker):</label>
+                    <input type="text" id="ordem-ticker" required placeholder="Ex: PETR4.SA">
+                </div>
+                <div class="form-group">
+                    <label>Tipo de Ordem:</label>
+                    <select id="ordem-tipo" required>
+                        <option value="COMPRA">Compra</option>
+                        <option value="VENDA">Venda</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Quantidade:</label>
+                    <input type="number" id="ordem-quantidade" required min="1">
+                </div>
+                <div class="form-group">
+                    <label>Preço Executado (R$):</label>
+                    <input type="number" id="ordem-preco" required step="0.01" placeholder="0.00">
+                </div>
+                <div class="form-group">
+                    <label>Data da Operação:</label>
+                    <input type="date" id="ordem-data" required>
+                </div>
+                <button type="submit" class="btn-sucesso">Registrar Ordem</button>
+            </form>
+        </div>
+    </div>
     <script src="app.js"></script>
 </body>
 </html>
