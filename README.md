@@ -1,4 +1,4 @@
-# Portal de Ações v3 — Supabase + GitHub Pages
+# Portal de Ações v3.1 — Supabase + GitHub Pages
 
 Site estático (GitHub Pages) + banco PostgreSQL (Supabase) + cotações da brapi.dev.
 

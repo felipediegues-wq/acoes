@@ -5,6 +5,38 @@
 //  Posição calculada a partir das ordens (preço médio padrão Receita)
 //  Fechamento diário por carteira gravado no banco + gráficos de evolução
 // ====================================================================
+
+// ---------- compatibilidade com celulares mais antigos (iOS < 15.4) ----------
+if (!Array.prototype.at) {
+    Object.defineProperty(Array.prototype, 'at', {
+        value: function (i) { i = Math.trunc(i) || 0; if (i < 0) i += this.length; return this[i]; },
+        writable: true, configurable: true
+    });
+}
+
+// ---------- qualquer erro aparece na tela (para conseguir diagnosticar pelo celular) ----------
+function mostrarErro(msg) {
+    const el = document.getElementById('aviso');
+    if (!el) return;
+    el.textContent = 'Erro: ' + msg;
+    el.classList.remove('oculto');
+}
+window.addEventListener('error', (e) => mostrarErro((e.message || 'desconhecido') + (e.filename ? ` (${e.filename.split('/').pop()}:${e.lineno})` : '')));
+window.addEventListener('unhandledrejection', (e) => mostrarErro(e.reason?.message || String(e.reason)));
+
+// ---------- fetch com tempo limite: rede lenta não trava a tela ----------
+async function buscar(url, opcoes = {}, ms = 12000) {
+    if (typeof AbortController === 'undefined') return fetch(url, opcoes);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try { return await fetch(url, { ...opcoes, signal: ctrl.signal }); }
+    catch (e) { throw e.name === 'AbortError' ? new Error('tempo esgotado') : e; }
+    finally { clearTimeout(t); }
+}
+
+if (!window.supabase || !window.APP_CONFIG) {
+    mostrarErro('não carregou ' + (!window.APP_CONFIG ? 'o config.js' : 'a biblioteca do Supabase (verifique a internet)'));
+}
 const sb = window.supabase.createClient(APP_CONFIG.SUPABASE_URL, APP_CONFIG.SUPABASE_KEY);
 
 // ---------------- utilitários ----------------
@@ -178,17 +210,34 @@ async function recarregarTudo(forcarCotacao) {
     btn.disabled = true;
     try {
         await carregarBanco();
-        preencherSelects();
-        await atualizarCotacoes(forcarCotacao);
-        await salvarFechamentos();
-        renderTudo();
-        atualizarIndicadores(forcarCotacao).then(renderMercado);   // não segura a tela esperando
     } catch (err) {
         console.error(err);
         aviso('Erro ao acessar o banco: ' + (err.message || err));
+        btn.disabled = false;
+        return;
+    }
+    // 1) mostra a tela na hora, com as últimas cotações guardadas neste aparelho
+    try {
+        preencherSelects();
+        COTACOES = lerLocal(CHAVE_CACHE, {});
+        atualizarInfoCotacao();
+        renderTudo();
+    } catch (err) {
+        console.error(err);
+        mostrarErro('ao montar a tela: ' + (err.message || err));
+    }
+    // 2) depois busca cotações novas e redesenha
+    try {
+        await atualizarCotacoes(forcarCotacao);
+        await salvarFechamentos();
+        renderTudo();
+    } catch (err) {
+        console.error(err);
+        aviso('Cotações não atualizaram: ' + (err.message || err) + ' (mostrando os últimos valores guardados)');
     } finally {
         btn.disabled = false;
     }
+    atualizarIndicadores(forcarCotacao).then(renderMercado).catch(e => console.warn(e));   // não segura a tela esperando
 }
 
 function renderTudo() {
@@ -218,7 +267,7 @@ function gravarLocal(chave, valor) {
 async function consultarBrapi(ticker) {
     const token = lerLocal(CHAVE_TOKEN, '');
     const url = `https://brapi.dev/api/quote/${encodeURIComponent(ticker)}` + (token ? `?token=${encodeURIComponent(token)}` : '');
-    const res = await fetch(url);
+    const res = await buscar(url);
     if (!res.ok) throw new Error(`${ticker}: HTTP ${res.status}`);
     const json = await res.json();
     const r = json.results && json.results[0];
@@ -261,14 +310,14 @@ async function atualizarCotacoes(forcar) {
     const cache = lerLocal(CHAVE_CACHE, {});
     const tickers = [...tickersEmUso(), IBOV];   // o Ibovespa vem junto (1 chamada a mais)
     const pendentes = tickers.filter(t => forcar || !cache[t] || Date.now() - cache[t].em > intervaloAutoMs());
-    let falhas = [];
+    let falhas = [], semRede = 0;
 
     for (let i = 0; i < pendentes.length; i += 4) {          // até 4 consultas em paralelo
         const lote = pendentes.slice(i, i + 4);
         const resp = await Promise.allSettled(lote.map(buscarCotacao));
         resp.forEach((r, k) => {
             if (r.status === 'fulfilled') cache[lote[k]] = r.value;
-            else falhas.push(lote[k]);
+            else { falhas.push(lote[k]); if (/tempo esgotado|Failed to fetch|NetworkError|Load failed/i.test(r.reason?.message || '')) semRede++; }
         });
     }
     gravarLocal(CHAVE_CACHE, cache);
@@ -278,7 +327,9 @@ async function atualizarCotacoes(forcar) {
 
     ibovIndisponivel = falhas.includes(IBOV);
     falhas = falhas.filter(t => t !== IBOV);
-    if (falhas.length) {
+    if (falhas.length && semRede >= falhas.length) {
+        aviso(`A brapi não respondeu a tempo (${falhas.join(', ')}) — internet lenta ou instável? Mostrando os últimos valores guardados; toque em atualizar para tentar de novo.`);
+    } else if (falhas.length) {
         const token = lerLocal(CHAVE_TOKEN, '');
         aviso(`Não consegui cotar: ${falhas.join(', ')}.` +
               (token ? ' Confira se o ticker existe na B3.'
@@ -307,7 +358,7 @@ async function buscarListaB3() {
     // 1) screener v2
     try {
         const url = 'https://brapi.dev/api/v2/stocks/screener?type=stock&sortBy=marketCap&sortOrder=desc&limit=200';
-        const res = await fetch(url, token ? { headers: { Authorization: 'Bearer ' + token } } : {});
+        const res = await buscar(url, token ? { headers: { Authorization: 'Bearer ' + token } } : {});
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const j = await res.json();
         const itens = (j.results || []).map(r => ({
@@ -321,7 +372,7 @@ async function buscarListaB3() {
     try {
         const url = 'https://brapi.dev/api/quote/list?type=stock&sortBy=market_cap_basic&sortOrder=desc&limit=200' +
                     (token ? '&token=' + encodeURIComponent(token) : '');
-        const res = await fetch(url);
+        const res = await buscar(url);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const j = await res.json();
         const itens = (j.stocks || []).map(s => ({
@@ -357,7 +408,7 @@ async function atualizarDolar(forcar) {
     const erros = [];
     try {   // 1) AwesomeAPI (gratuita)
         const tk = APP_CONFIG.AWESOMEAPI_TOKEN ? '?token=' + encodeURIComponent(APP_CONFIG.AWESOMEAPI_TOKEN) : '';
-        const res = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL' + tk);
+        const res = await buscar('https://economia.awesomeapi.com.br/json/last/USD-BRL' + tk);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const q = (await res.json()).USDBRL;
         const preco = Number(q?.bid);
@@ -367,7 +418,7 @@ async function atualizarDolar(forcar) {
         erros.push('AwesomeAPI: ' + e.message);
         try {   // 2) brapi
             const token = lerLocal(CHAVE_TOKEN, '');
-            const res = await fetch('https://brapi.dev/api/v2/currency?currency=USD-BRL' + (token ? '&token=' + encodeURIComponent(token) : ''));
+            const res = await buscar('https://brapi.dev/api/v2/currency?currency=USD-BRL' + (token ? '&token=' + encodeURIComponent(token) : ''));
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const q = (await res.json()).currency?.[0];
             const preco = Number(q?.bidPrice ?? q?.askPrice);
@@ -386,7 +437,7 @@ async function atualizarIpca15(forcar) {
     if (!forcar && i?.valor != null && Date.now() - i.em < 12 * 3600 * 1000) return;   // sai uma vez por mês: confere 2x por dia
     try {
         const serie = Number(APP_CONFIG.SERIE_IPCA15) || 7478;
-        const res = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados/ultimos/12?formato=json`);
+        const res = await buscar(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados/ultimos/12?formato=json`);
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const lista = (await res.json()).map(x => ({ data: x.data, v: Number(String(x.valor).replace(',', '.')) })).filter(x => isFinite(x.v));
         if (!lista.length) throw new Error('série vazia');
