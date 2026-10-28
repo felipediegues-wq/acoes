@@ -77,6 +77,37 @@ input:focus, select:focus { outline: none; border-color: var(--verde); }
 .lucro { color: var(--verde); font-weight: bold; }
 .prejuizo { color: var(--vermelho); font-weight: bold; }
 
+/* ---------- Menu: títulos de grupo ---------- */
+.sidebar ul li.separador { color: #666; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; margin: 22px 0 10px; }
+
+/* ---------- Formulário: campos maiores ---------- */
+.form-grid .duplo { grid-column: span 2; }
+.input-botao { display: flex; gap: 6px; }
+.input-botao input { flex: 1; min-width: 0; }
+.input-botao .btn { padding: 8px 12px; }
+input[readonly] { color: var(--sutil); }
+
+/* ---------- Busca de ativo (autocomplete) ---------- */
+.busca-ativo { position: relative; }
+.sugestoes { position: absolute; top: 100%; left: 0; right: 0; z-index: 20; margin-top: 2px; background: #181818; border: 1px solid #555; border-radius: 4px; max-height: 260px; overflow-y: auto; box-shadow: 0 6px 16px rgba(0,0,0,.5); }
+.sugestoes div { padding: 8px 10px; cursor: pointer; color: var(--texto); font-size: .9rem; display: flex; justify-content: space-between; gap: 10px; }
+.sugestoes div small { color: var(--sutil); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sugestoes div.sel, .sugestoes div:hover { background: #2a3a2a; }
+.sugestoes div.novo { color: var(--verde); border-top: 1px solid #333; display: block; }
+
+/* ---------- Evolução ---------- */
+.periodos { display: flex; gap: 4px; }
+.periodos button { background: #2a2a2a; color: #bbb; border: 1px solid #444; padding: 7px 12px; border-radius: 4px; cursor: pointer; font-weight: 600; }
+.periodos button.ativo { background: var(--verde); border-color: var(--verde); color: #fff; }
+.graficos { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grafico { margin-bottom: 0; min-width: 0; }   /* min-width:0 deixa o gráfico encolher no celular */
+.grafico.largo { grid-column: 1 / -1; }
+.grafico h3 { font-size: 1rem; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.canvas-box { position: relative; height: 300px; }
+select.mini { padding: 4px 6px; font-size: .8rem; }
+.graficos + .sutil { margin-top: 14px; }
+.resumo .item small { display: block; font-size: .8rem; margin-top: 2px; }
+
 /* ---------- Celular ---------- */
 @media (max-width: 860px) {
     .app { flex-direction: column; }
@@ -87,5 +118,8 @@ input:focus, select:focus { outline: none; border-color: var(--verde); }
     .sidebar ul li a.ativo { border-left: none; padding-left: 0; border-bottom: 2px solid var(--verde); }
     .sidebar-rodape { flex-direction: row; justify-content: space-between; margin-top: 10px; }
     .main-content { padding: 16px; }
-    .duas-colunas { grid-template-columns: 1fr; }
+    .duas-colunas, .graficos { grid-template-columns: 1fr; }
+    .form-grid .duplo { grid-column: 1 / -1; }
+    .sidebar ul li.separador { display: none; }
+    .canvas-box { height: 240px; }
 }
