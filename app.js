@@ -182,6 +182,7 @@ async function recarregarTudo(forcarCotacao) {
         await atualizarCotacoes(forcarCotacao);
         await salvarFechamentos();
         renderTudo();
+        atualizarIndicadores(forcarCotacao).then(renderMercado);   // não segura a tela esperando
     } catch (err) {
         console.error(err);
         aviso('Erro ao acessar o banco: ' + (err.message || err));
@@ -258,9 +259,9 @@ function tickersEmUso() {
 
 async function atualizarCotacoes(forcar) {
     const cache = lerLocal(CHAVE_CACHE, {});
-    const tickers = tickersEmUso();
+    const tickers = [...tickersEmUso(), IBOV];   // o Ibovespa vem junto (1 chamada a mais)
     const pendentes = tickers.filter(t => forcar || !cache[t] || Date.now() - cache[t].em > intervaloAutoMs());
-    const falhas = [];
+    let falhas = [];
 
     for (let i = 0; i < pendentes.length; i += 4) {          // até 4 consultas em paralelo
         const lote = pendentes.slice(i, i + 4);
@@ -273,7 +274,10 @@ async function atualizarCotacoes(forcar) {
     gravarLocal(CHAVE_CACHE, cache);
     COTACOES = cache;
     atualizarInfoCotacao();
+    renderIbovTopo();
 
+    ibovIndisponivel = falhas.includes(IBOV);
+    falhas = falhas.filter(t => t !== IBOV);
     if (falhas.length) {
         const token = lerLocal(CHAVE_TOKEN, '');
         aviso(`Não consegui cotar: ${falhas.join(', ')}.` +
@@ -283,6 +287,195 @@ async function atualizarCotacoes(forcar) {
     } else {
         aviso('');
     }
+}
+
+// ====================================================================
+// MERCADO: Ibovespa e maiores altas/baixas
+//  Ibovespa: /api/quote/^BVSP (mesma consulta das ações).
+//  Altas/baixas: 1 chamada que traz as 200 maiores empresas da B3 com a variação
+//  do dia; o portal filtra pelas ações do Ibovespa (lista no config.js).
+//  Tenta o screener (v2) e, se o plano não permitir, a listagem antiga (v1).
+// ====================================================================
+const IBOV = '^BVSP';
+const CHAVE_MERCADO = 'cache_mercado_v1';
+let ibovIndisponivel = false;
+let MERCADO = lerLocal(CHAVE_MERCADO, null);   // { em, itens:[{t,nome,preco,v}], fonte } ou { em, erro }
+
+async function buscarListaB3() {
+    const token = lerLocal(CHAVE_TOKEN, '');
+    const erros = [];
+    // 1) screener v2
+    try {
+        const url = 'https://brapi.dev/api/v2/stocks/screener?type=stock&sortBy=marketCap&sortOrder=desc&limit=200';
+        const res = await fetch(url, token ? { headers: { Authorization: 'Bearer ' + token } } : {});
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const j = await res.json();
+        const itens = (j.results || []).map(r => ({
+            t: normTicker(r.symbol), nome: r.name || r.longName || '',
+            preco: Number(r.quote?.lastPrice), v: Number(r.quote?.changePercent), vol: Number(r.quote?.volume) || 0
+        })).filter(x => x.t && isFinite(x.preco) && isFinite(x.v));
+        if (itens.length) return { itens, fonte: 'v2' };
+        throw new Error('lista vazia');
+    } catch (e) { erros.push('screener: ' + e.message); }
+    // 2) listagem v1
+    try {
+        const url = 'https://brapi.dev/api/quote/list?type=stock&sortBy=market_cap_basic&sortOrder=desc&limit=200' +
+                    (token ? '&token=' + encodeURIComponent(token) : '');
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const j = await res.json();
+        const itens = (j.stocks || []).map(s => ({
+            t: normTicker(s.stock), nome: s.name || '', preco: Number(s.close), v: Number(s.change), vol: Number(s.volume) || 0
+        })).filter(x => x.t && isFinite(x.preco) && isFinite(x.v));
+        if (itens.length) return { itens, fonte: 'v1' };
+        throw new Error('lista vazia');
+    } catch (e) { erros.push('lista: ' + e.message); }
+    throw new Error(erros.join(' · '));
+}
+
+async function atualizarMercado(forcar) {
+    const valido = MERCADO && Date.now() - MERCADO.em < intervaloAutoMs();
+    if (!forcar && valido) return;
+    if (!forcar && MERCADO && !janelaAutomatica() && MERCADO.itens) return;   // fora do pregão a lista não muda
+    try {
+        const r = await buscarListaB3();
+        MERCADO = { em: Date.now(), ...r };
+    } catch (e) {
+        console.warn('Maiores altas/baixas indisponível:', e.message);
+        MERCADO = MERCADO?.itens ? { ...MERCADO, erroRecente: e.message } : { em: Date.now(), erro: e.message };
+    }
+    gravarLocal(CHAVE_MERCADO, MERCADO);
+}
+
+// ---------------- Dólar comercial e IPCA-15 ----------------
+const CHAVE_IND = 'cache_indicadores_v1';
+let INDICADORES = lerLocal(CHAVE_IND, {});   // { dolar:{preco,v,em,fonte}|{erro}, ipca15:{mes,valor,acum12,em}|{erro} }
+
+async function atualizarDolar(forcar) {
+    const d = INDICADORES.dolar;
+    if (!forcar && d?.preco && (Date.now() - d.em < intervaloAutoMs() || !janelaAutomatica())) return;
+    const erros = [];
+    try {   // 1) AwesomeAPI (gratuita)
+        const tk = APP_CONFIG.AWESOMEAPI_TOKEN ? '?token=' + encodeURIComponent(APP_CONFIG.AWESOMEAPI_TOKEN) : '';
+        const res = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL' + tk);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const q = (await res.json()).USDBRL;
+        const preco = Number(q?.bid);
+        if (!isFinite(preco) || !preco) throw new Error('sem cotação');
+        INDICADORES.dolar = { preco, v: Number(q.pctChange) || 0, em: Date.now(), fonte: 'AwesomeAPI' };
+    } catch (e) {
+        erros.push('AwesomeAPI: ' + e.message);
+        try {   // 2) brapi
+            const token = lerLocal(CHAVE_TOKEN, '');
+            const res = await fetch('https://brapi.dev/api/v2/currency?currency=USD-BRL' + (token ? '&token=' + encodeURIComponent(token) : ''));
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const q = (await res.json()).currency?.[0];
+            const preco = Number(q?.bidPrice ?? q?.askPrice);
+            if (!isFinite(preco) || !preco) throw new Error('sem cotação');
+            INDICADORES.dolar = { preco, v: Number(q.percentageChange ?? q.bidVariation) || 0, em: Date.now(), fonte: 'brapi' };
+        } catch (e2) {
+            erros.push('brapi: ' + e2.message);
+            INDICADORES.dolar = d?.preco ? { ...d, erroRecente: erros.join(' · ') } : { erro: erros.join(' · '), em: Date.now() };
+        }
+    }
+    gravarLocal(CHAVE_IND, INDICADORES);
+}
+
+async function atualizarIpca15(forcar) {
+    const i = INDICADORES.ipca15;
+    if (!forcar && i?.valor != null && Date.now() - i.em < 12 * 3600 * 1000) return;   // sai uma vez por mês: confere 2x por dia
+    try {
+        const serie = Number(APP_CONFIG.SERIE_IPCA15) || 7478;
+        const res = await fetch(`https://api.bcb.gov.br/dados/serie/bcdata.sgs.${serie}/dados/ultimos/12?formato=json`);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const lista = (await res.json()).map(x => ({ data: x.data, v: Number(String(x.valor).replace(',', '.')) })).filter(x => isFinite(x.v));
+        if (!lista.length) throw new Error('série vazia');
+        const ult = lista.at(-1);
+        const [, mm, aaaa] = ult.data.split('/');
+        const acum12 = lista.length >= 12 ? (lista.slice(-12).reduce((f, x) => f * (1 + x.v / 100), 1) - 1) * 100 : null;
+        INDICADORES.ipca15 = { mes: `${mm}/${aaaa}`, valor: ult.v, acum12, em: Date.now() };
+    } catch (e) {
+        INDICADORES.ipca15 = i?.valor != null ? { ...i, erroRecente: e.message } : { erro: e.message, em: Date.now() };
+    }
+    gravarLocal(CHAVE_IND, INDICADORES);
+}
+
+const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const mesCurto = (mmaaaa) => { const [m, a] = mmaaaa.split('/'); return `${MESES[Number(m) - 1]}/${a.slice(2)}`; };
+const bilhoes = (v) => v >= 1e9 ? 'R$ ' + num(v / 1e9, 1) + ' bi' : 'R$ ' + num(v / 1e6, 0) + ' mi';
+
+async function atualizarIndicadores(forcar) {
+    await Promise.all([atualizarMercado(forcar), atualizarDolar(forcar), atualizarIpca15(forcar)]);
+}
+
+function renderIbovTopo() {
+    const c = COTACOES[IBOV];
+    if (!$('ibov-topo')) return;   // espaço opcional no topo (removido do layout atual)
+    $('ibov-topo').innerHTML = c
+        ? `IBOV ${num(c.preco, 0)} <span class="${classe(c.variacao)}">${seta(c.variacao)}${pct(c.variacao)}</span>`
+        : '';
+}
+
+function renderMercado() {
+    renderIbovTopo();
+    // ---------- Indicadores: Ibovespa, dólar, volume, IPCA-15 ----------
+    const c = COTACOES[IBOV];
+    const d = INDICADORES.dolar, ip = INDICADORES.ipca15;
+    const volume = MERCADO?.itens ? MERCADO.itens.reduce((s, x) => s + (x.vol || 0) * x.preco, 0) : 0;
+    const linhaInd = (nome, valor, detalhe, titulo = '') => `
+        <div class="ind-item" ${titulo ? `title="${esc(titulo)}"` : ''}>
+            <span class="ind-nome">${nome}</span>
+            <span class="ind-valor">${valor}</span>
+            <span class="ind-det">${detalhe}</span>
+        </div>`;
+    const indisp = (msg) => `<span class="sutil">${msg}</span>`;
+    $('ibov-box').innerHTML = `
+        <span class="rotulo">Indicadores</span>
+        ${linhaInd('Ibovespa',
+            c ? `${num(c.preco, 0)} <small class="sutil">pts</small>` : indisp(ibovIndisponivel ? 'indisponível' : '…'),
+            c ? `<span class="${classe(c.variacao)}">${seta(c.variacao)}${pct(c.variacao)}</span>` : '',
+            c?.anterior ? `Fechamento anterior: ${num(c.anterior, 0)} pts · cotação de ${horaSP(c.mercado || c.em)}` : '')}
+        ${linhaInd('Dólar comercial',
+            d?.preco ? `R$ ${num(d.preco, 4)}` : indisp(d?.erro ? 'indisponível' : '…'),
+            d?.preco ? `<span class="${classe(d.v)}">${seta(d.v)}${pct(d.v)}</span>` : '',
+            d?.preco ? `À vista, compra · ${d.fonte} · ${horaSP(d.em)}` : (d?.erro || ''))}
+        ${linhaInd('Volume financeiro',
+            volume > 0 ? bilhoes(volume) : indisp(MERCADO?.erro ? 'indisponível' : '…'),
+            volume > 0 ? '<small class="sutil">aprox.</small>' : '',
+            'Soma de volume × preço das 200 maiores ações da B3 no dia (aproximação do volume da bolsa)')}
+        ${linhaInd(ip?.mes ? `IPCA-15 <small class="sutil">${mesCurto(ip.mes)}</small>` : 'IPCA-15',
+            ip?.valor != null ? `${num(ip.valor)}%` : indisp(ip?.erro ? 'indisponível' : '…'),
+            ip?.acum12 != null ? `<small class="sutil">12m</small> ${num(ip.acum12)}%` : '',
+            ip?.erro ? 'Banco Central: ' + ip.erro : 'Prévia da inflação (IBGE), variação no mês · fonte: Banco Central (SGS)')}`;
+
+    // ---------- maiores altas / baixas ----------
+    if (!MERCADO) { $('lista-altas').innerHTML = $('lista-baixas').innerHTML = '<p class="mercado-aviso">Carregando…</p>'; return; }
+    if (MERCADO.erro) {
+        const msg = `<p class="mercado-aviso">A lista não veio da brapi (${esc(MERCADO.erro)}). ` +
+            (lerLocal(CHAVE_TOKEN, '') ? 'Provavelmente o seu plano da brapi não libera essa consulta.' : 'Cadastre o token da brapi em Configurações.') + '</p>';
+        $('lista-altas').innerHTML = msg; $('lista-baixas').innerHTML = '';
+        $('mercado-info').textContent = '';
+        return;
+    }
+    const indice = new Set((APP_CONFIG.IBOVESPA || []).map(normTicker));
+    let base = MERCADO.itens.filter(x => indice.has(x.t));
+    let rotulo = 'Ibovespa';
+    if (base.length < 10) { base = MERCADO.itens; rotulo = '200 maiores da B3'; }
+    const ordenado = [...base].sort((a, b) => b.v - a.v);
+    const altas = ordenado.filter(x => x.v > 0).slice(0, 5);
+    const baixas = ordenado.filter(x => x.v < 0).reverse().slice(0, 5);
+    const minhas = new Set([...calcularPosicoes().values()].filter(p => p.qtd > 0).map(p => normTicker(ativoDe(p.ativo_id)?.ticker)));
+    const item = (x) => `<div class="mov-item">
+            <span class="nome"><strong>${esc(x.t)}</strong>${minhas.has(x.t) ? '<span class="na-carteira">na carteira</span>' : `<small>${esc(x.nome)}</small>`}</span>
+            <span class="preco">${num(x.preco)}</span>
+            <span class="var ${classe(x.v)}">${seta(x.v)}${pct(x.v)}</span>
+        </div>`;
+    $('lista-altas').innerHTML = altas.map(item).join('') || '<p class="mercado-aviso">Nenhuma ação em alta.</p>';
+    $('lista-baixas').innerHTML = baixas.map(item).join('') || '<p class="mercado-aviso">Nenhuma ação em baixa.</p>';
+    document.querySelectorAll('.mov-col h3')[0].textContent = `Maiores altas · ${rotulo}`;
+    document.querySelectorAll('.mov-col h3')[1].textContent = `Maiores baixas · ${rotulo}`;
+    $('mercado-info').textContent = `${base.length} ações · atualizado ${horaSP(MERCADO.em)}` +
+        (MERCADO.erroRecente ? ' (última tentativa falhou)' : '');
 }
 
 // ====================================================================
@@ -312,8 +505,8 @@ function atualizarInfoCotacao() {
     horaCotacao = horaSP(maisAntiga);
     const auto = janelaAutomatica();
     el.classList.toggle('auto', auto);
-    el.textContent = `Cotações ${horaCotacao} · ${auto ? 'automática' : 'pregão fechado'}`;
-    el.title = auto ? `Próxima atualização por volta de ${horaSP(maisAntiga + intervaloAutoMs())}` : '';
+    el.textContent = auto ? `Cotações ${horaCotacao}` : `${horaCotacao} · fechado`;
+    el.title = auto ? `Atualização automática · próxima por volta de ${horaSP(maisAntiga + intervaloAutoMs())}` : 'Pregão fechado';
 }
 
 let autoRodando = false;
@@ -324,6 +517,7 @@ async function cicloAutomatico() {
     try {
         await atualizarCotacoes(false);       // só busca o que venceu
         await salvarFechamentos();
+        await atualizarIndicadores(false);
         renderAtivos();
         renderCarteiras();
         renderGraficosVisiveis();
@@ -422,6 +616,7 @@ async function salvarFechamentos() {
             inv += p.custo;
         }
         if (!temOrdem) continue;
+        if (fechados[IBOV]) precos[IBOV] = Number(fechados[IBOV].preco.toFixed(2));   // guarda o Ibovespa do dia para comparar
         const linha = { carteira_id: c.id, data: dataFech, valor_mercado: Number(vm.toFixed(2)), valor_investido: Number(inv.toFixed(2)), precos };
         const existente = DB.fechamentos.find(f => f.carteira_id === c.id && f.data === dataFech);
         if (existente && soSeNaoExistir) continue;
@@ -630,7 +825,9 @@ function renderVisao() {
             <span class="chip ${classe(res)}">${seta(res)}${sinalBrl(res)} (${pct(resPct)})</span>
             ${R.varDia != null ? `<span class="chip ${classe(R.varDia)}">${seta(R.varDia)}${rotuloDia.toLowerCase()} ${pct(R.varDia)}</span>` : ''}
             ${R.rent != null ? `<span class="chip">rent. ${pct(R.rent)}</span>` : ''}
+            ${COTACOES[IBOV] ? `<span class="chip">IBOV ${num(COTACOES[IBOV].preco, 0)} <span class="${classe(COTACOES[IBOV].variacao)}">${pct(COTACOES[IBOV].variacao)}</span></span>` : ''}
         </div>`;
+    renderMercado();
 
     // ---------- gráfico patrimônio x investido ----------
     if (window.Chart) {
@@ -778,6 +975,8 @@ function renderEvolucao() {
               R.inicio ? `desde ${dataBR(R.inicio === 'AGORA' ? hojeSP() : R.inicio)}` : '', classe(R.rent)) +
           kpi('Proventos no período', brl.format(R.provPeriodo), `${R.vis.length} fechamento(s) no período`);
 
+    renderTabelaAtivos(cids, R);
+
     // ---------- rentabilidade acumulada por carteira ----------
     const carts = DB.carteiras.filter(c => cids.has(c.id));
     const datasets = [];
@@ -788,6 +987,18 @@ function renderEvolucao() {
     });
     carts.forEach((c, i) => linha(resumoPeriodo(new Set([c.id]), base), c.nome, CORES[i % CORES.length], false));
     if (carts.length > 1) linha(R, 'Total', '#E6EAF0', true);
+
+    // Ibovespa no mesmo período (fechamentos guardados + agora), para comparar
+    const datasVis = base.datas.slice(R.ini);
+    const ibov = datasVis.map(d => base.precosPorData.get(d)?.[IBOV] ?? null);
+    const ibovBase = (R.ini > 0 ? base.precosPorData.get(base.datas[R.ini - 1])?.[IBOV] : null) ?? ibov.find(v => v != null);
+    if (ibovBase && ibov.filter(v => v != null).length >= 2) {
+        datasets.push({
+            label: 'Ibovespa', borderColor: '#E8A23A', backgroundColor: '#E8A23A', borderDash: [2, 3], borderWidth: 2,
+            tension: .25, pointRadius: 0,
+            data: ibov.map(v => v != null ? +((v / ibovBase - 1) * 100).toFixed(2) : null)
+        });
+    }
     desenhar('g-rentabilidade', {
         type: 'line',
         data: { labels: R.rotulos, datasets },
@@ -838,6 +1049,100 @@ function renderEvolucao() {
             scales: { x: { grid: { display: false } }, y: { ticks: { callback: brlCurto } } }
         }
     });
+}
+
+// ====================================================================
+// EVOLUÇÃO: tabela de ativos (soma o mesmo ativo das carteiras filtradas)
+// ====================================================================
+let ordemAtivos = { campo: 'valor', desc: true };
+
+document.addEventListener('click', (e) => {
+    const th = e.target.closest('.tabela-ativos th[data-ordenar]');
+    if (!th) return;
+    const campo = th.dataset.ordenar;
+    ordemAtivos = ordemAtivos.campo === campo ? { campo, desc: !ordemAtivos.desc } : { campo, desc: campo !== 'ticker' };
+    renderEvolucao();
+});
+
+// Minigráfico: preço de fechamento de cada dia salvo no período (+ cotação atual) contra a linha do preço médio
+function sparkline(precos, pm) {
+    if (precos.length < 2) return '<span class="sutil">—</span>';
+    const W = 150, H = 34, P = 3;
+    const min = Math.min(pm, ...precos), max = Math.max(pm, ...precos);
+    const amp = max - min || 1;
+    const x = (i) => P + i * (W - 2 * P) / (precos.length - 1);
+    const y = (v) => H - P - (v - min) / amp * (H - 2 * P);
+    const pontos = precos.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+    const ult = precos.at(-1);
+    const cor = ult >= pm ? '#4CC98A' : '#F2737B';
+    const desc = `Preço foi de ${num(precos[0])} para ${num(ult)}; preço médio ${num(pm)}`;
+    return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${desc}">
+        <line x1="${P}" x2="${W - P}" y1="${y(pm).toFixed(1)}" y2="${y(pm).toFixed(1)}" stroke="#8B95A3" stroke-width="1" stroke-dasharray="3 3"></line>
+        <polyline points="${pontos}" fill="none" stroke="${cor}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"></polyline>
+        <circle cx="${x(precos.length - 1).toFixed(1)}" cy="${y(ult).toFixed(1)}" r="2.6" fill="${cor}"></circle>
+    </svg>`;
+}
+
+function renderTabelaAtivos(cids, R) {
+    // consolida por ativo
+    const mapa = new Map();
+    for (const p of calcularPosicoes().values()) {
+        if (!cids.has(p.carteira_id) || p.qtd <= 0) continue;
+        const a = ativoDe(p.ativo_id);
+        const g = mapa.get(p.ativo_id) || { a, ticker: a?.ticker || '', qtd: 0, custo: 0 };
+        g.qtd += p.qtd; g.custo += p.custo;
+        mapa.set(p.ativo_id, g);
+    }
+    const datasVis = R.base.datas.slice(R.ini);
+    const linhas = [...mapa.values()].map(g => {
+        const cot = COTACOES[normTicker(g.ticker)];
+        const pm = g.custo / g.qtd;
+        const cotacao = cot ? cot.preco : null;
+        const valor = g.qtd * (cotacao ?? pm);
+        const rend = valor - g.custo;
+        const precos = datasVis.map(d => R.base.precosPorData.get(d)?.[normTicker(g.ticker)]).filter(v => v != null);
+        return { ...g, pm, cotacao, dia: cot ? cot.variacao : null, valor, rend, rendPct: g.custo > 0 ? rend / g.custo * 100 : 0, precos };
+    });
+
+    const { campo, desc } = ordemAtivos;
+    linhas.sort((x, y) => {
+        const vx = x[campo] ?? -Infinity, vy = y[campo] ?? -Infinity;
+        const c = typeof vx === 'string' ? vx.localeCompare(vy) : vx - vy;
+        return desc ? -c : c;
+    });
+    document.querySelectorAll('.tabela-ativos th[data-ordenar]').forEach(th => {
+        if (th.dataset.ordenar === campo) th.setAttribute('aria-sort', desc ? 'descending' : 'ascending');
+        else th.removeAttribute('aria-sort');
+    });
+
+    const maxAbs = Math.max(...linhas.map(l => Math.abs(l.rendPct)), 1);
+    const sinal = (v) => (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + num(Math.abs(v));
+    $('tb-evol-ativos').innerHTML = linhas.map(l => {
+        const larg = Math.min(50, Math.abs(l.rendPct) / maxAbs * 50);
+        const barra = `<span class="rend-barra"><i style="${l.rendPct >= 0 ? 'left:50%' : 'right:50%'};width:${larg.toFixed(1)}%;background:${l.rendPct >= 0 ? '#3FB97A' : '#F2737B'}"></i></span>`;
+        return `<tr>
+            <td><strong>${esc(l.ticker)}</strong><span class="ativo-nome">${esc(l.a?.nome || '')}</span></td>
+            <td class="num">${qtdFmt(l.qtd)}</td>
+            <td class="num">${num(l.pm)}</td>
+            <td class="num">${num(l.custo)}</td>
+            <td class="num">${l.cotacao != null ? num(l.cotacao) : '—'}</td>
+            <td class="num ${classe(l.dia)}">${l.dia != null ? `<span class="seta-dia">${seta(l.dia)}${pct(l.dia)}</span>` : '—'}</td>
+            <td class="num">${num(l.valor)}${l.cotacao == null ? ' <span class="sutil" title="Sem cotação: usando o preço médio">*</span>' : ''}</td>
+            <td class="num ${classe(l.rend)}">${sinal(l.rend)}</td>
+            <td class="num ${classe(l.rendPct)}">${pct(l.rendPct)}${barra}</td>
+            <td>${sparkline(l.precos, l.pm)}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="10" class="vazio">Nenhum ativo em posição nas carteiras selecionadas.</td></tr>';
+
+    const tCusto = linhas.reduce((s, l) => s + l.custo, 0), tValor = linhas.reduce((s, l) => s + l.valor, 0);
+    const tRend = tValor - tCusto, tPct = tCusto > 0 ? tRend / tCusto * 100 : 0;
+    $('tf-evol-ativos').innerHTML = !linhas.length ? '' : `<tr>
+        <td>Total (${linhas.length} ativo${linhas.length > 1 ? 's' : ''})</td><td></td><td></td>
+        <td class="num">${num(tCusto)}</td><td></td><td></td>
+        <td class="num">${num(tValor)}</td>
+        <td class="num ${classe(tRend)}">${sinal(tRend)}</td>
+        <td class="num ${classe(tPct)}">${pct(tPct)}</td><td></td>
+    </tr>`;
 }
 
 function opcoesLinha(fmtEixo, rotulosLongos, fmtDica = fmtEixo, legenda = true) {

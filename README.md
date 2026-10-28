@@ -5,6 +5,30 @@ Site estático (GitHub Pages) + banco PostgreSQL (Supabase) + cotações da brap
 **Atualização v2 → v3 (só layout):** substitua `index.html`, `style.css` e `app.js` no GitHub.
 O banco não muda — não rode nenhum SQL.
 
+## Mercado hoje (indicadores + maiores altas e baixas)
+
+Quadro "Indicadores":
+
+| Indicador | Fonte | Atualização |
+|---|---|---|
+| Ibovespa | brapi (`^BVSP`) | junto com as cotações (15 min) |
+| Dólar comercial à vista | AwesomeAPI (`USD-BRL`, gratuita); reserva: brapi | 15 min, só no pregão |
+| Volume financeiro | soma de volume × preço das 200 maiores ações da B3 (aproximação) | junto com altas/baixas |
+| IPCA-15 | Banco Central, série SGS 7478 (variação mensal); acumulado 12 meses calculado | confere 2x por dia (sai 1x por mês) |
+
+O código da série e a chave opcional da AwesomeAPI ficam no `config.js` (`SERIE_IPCA15`, `AWESOMEAPI_TOKEN`).
+Se uma fonte não responder, a linha mostra "indisponível" (passe o mouse para ver o motivo) e o resto continua.
+
+- **Ibovespa**: consulta `^BVSP` na brapi junto com as cotações (1 chamada a mais por ciclo).
+  O valor do índice também é gravado no fechamento diário, e a tela Evolução mostra a linha
+  "Ibovespa" no gráfico de rentabilidade para comparar com as carteiras (a partir dos fechamentos
+  gravados por esta versão).
+- **Maiores altas e baixas**: 1 chamada que traz as 200 maiores empresas da B3 com a variação do dia;
+  o portal filtra pelas ações do Ibovespa listadas em `IBOVESPA` no `config.js`.
+  A B3 muda a composição do índice a cada 4 meses: confira em b3.com.br e ajuste a lista se precisar.
+- Se o seu plano da brapi não liberar essa consulta, o quadro mostra um aviso no lugar da lista
+  (o resto do portal continua funcionando).
+
 ## Layout
 
 - **Computador:** menu no topo, botão "+ Nova ordem" sempre visível, filtros de carteira e período

@@ -54,7 +54,9 @@
                 <a href="#" data-aba="config" class="btn-icone so-desktop" aria-label="Configurações" title="Configurações">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2 V5 M12 19 V22 M2 12 H5 M19 12 H22 M4.9 4.9 L7 7 M17 17 L19.1 19.1 M4.9 19.1 L7 17 M17 7 L19.1 4.9"></path></svg>
                 </a>
-                <button type="button" id="btn-sair" class="btn-link so-desktop" title="">Sair</button>
+                <button type="button" id="btn-sair" class="btn-icone so-desktop" aria-label="Sair" title="Sair">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M15 4 H19 V20 H15"></path><path d="M10 8 L6 12 L10 16 M6 12 H15"></path></svg>
+                </button>
             </div>
         </div>
     </header>
@@ -79,6 +81,24 @@
         <section id="aba-visao" class="aba-conteudo ativa">
             <div id="m-hero" class="m-hero so-celular"></div>
             <section id="kpis" class="kpis so-desktop" aria-label="Resumo"></section>
+
+            <section id="painel-mercado" class="painel mercado">
+                <div class="painel-topo">
+                    <h2>Mercado hoje</h2>
+                    <span id="mercado-info" class="sutil"></span>
+                </div>
+                <div class="mercado-grid">
+                    <div id="ibov-box" class="ibov-box"></div>
+                    <div class="mov-col">
+                        <h3>Maiores altas do Ibovespa</h3>
+                        <div id="lista-altas" class="mov-lista"></div>
+                    </div>
+                    <div class="mov-col">
+                        <h3>Maiores baixas do Ibovespa</h3>
+                        <div id="lista-baixas" class="mov-lista"></div>
+                    </div>
+                </div>
+            </section>
 
             <div class="linha-graficos">
                 <section class="painel grafico-principal">
@@ -133,6 +153,32 @@
         <!-- ================= EVOLUÇÃO ================= -->
         <section id="aba-evolucao" class="aba-conteudo">
             <section id="resumo-evolucao" class="kpis" aria-label="Resumo do período"></section>
+
+            <section class="painel sem-padding">
+                <div class="painel-topo com-padding">
+                    <h2>Ativos</h2>
+                    <span class="sutil dica-ordenar">Clique no título da coluna para ordenar · rendimento calculado sobre o preço médio das ordens</span>
+                </div>
+                <div class="tabela-wrap">
+                    <table class="dados tabela-ativos">
+                        <thead><tr>
+                            <th data-ordenar="ticker" class="ordenavel">Ativo</th>
+                            <th data-ordenar="qtd" class="num ordenavel">Quant.</th>
+                            <th data-ordenar="pm" class="num ordenavel">Preço médio</th>
+                            <th data-ordenar="custo" class="num ordenavel">Investido</th>
+                            <th data-ordenar="cotacao" class="num ordenavel">Cotação</th>
+                            <th data-ordenar="dia" class="num ordenavel">Dia</th>
+                            <th data-ordenar="valor" class="num ordenavel">Valor atual</th>
+                            <th data-ordenar="rend" class="num ordenavel">Rendimento</th>
+                            <th data-ordenar="rendPct" class="num ordenavel">Rend. %</th>
+                            <th class="col-evol">Evolução x preço médio</th>
+                        </tr></thead>
+                        <tbody id="tb-evol-ativos"></tbody>
+                        <tfoot id="tf-evol-ativos"></tfoot>
+                    </table>
+                </div>
+            </section>
+
             <div class="graficos">
                 <section class="painel largo">
                     <div class="painel-topo"><h2>Rentabilidade acumulada no período</h2></div>
