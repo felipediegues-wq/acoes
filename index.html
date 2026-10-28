@@ -2,8 +2,11 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Portal de Ações</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0E1116">
+    <title>Meus Investimentos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
@@ -13,116 +16,148 @@
 
 <!-- ================= LOGIN ================= -->
 <div id="tela-login" class="tela-login">
-    <form id="form-login" class="card login-card">
-        <h2>Meus Investimentos</h2>
+    <form id="form-login" class="painel login-card">
+        <div class="marca">
+            <svg width="30" height="30" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6" fill="#1C2A22"></rect><path d="M6 18 L11 12 L15 15 L20 8" stroke="#3FB97A" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <span>Meus Investimentos</span>
+        </div>
         <label>E-mail <input type="email" id="login-email" required autocomplete="username"></label>
         <label>Senha <input type="password" id="login-senha" required autocomplete="current-password"></label>
         <button type="submit" class="btn">Entrar</button>
-        <p id="login-erro" class="erro"></p>
+        <p id="login-erro" class="erro" role="alert"></p>
     </form>
 </div>
 
 <!-- ================= APP ================= -->
 <div id="tela-app" class="app oculto">
-    <nav class="sidebar">
-        <h2>Meus Investimentos</h2>
-        <ul>
-            <li><a href="#" data-aba="posicao" class="ativo">Posição</a></li>
-            <li><a href="#" data-aba="evolucao">Evolução</a></li>
-            <li class="separador">Lançamentos</li>
-            <li><a href="#" data-aba="ordens">Ordens</a></li>
-            <li><a href="#" data-aba="proventos">Proventos</a></li>
-            <li class="separador">Cadastros</li>
-            <li><a href="#" data-aba="ativos">Ativos</a></li>
-            <li><a href="#" data-aba="carteiras">Carteiras</a></li>
-            <li><a href="#" data-aba="config">Configurações</a></li>
-        </ul>
-        <div class="sidebar-rodape">
-            <span id="usuario-email"></span>
-            <button id="btn-sair" class="btn-link">Sair</button>
-        </div>
-    </nav>
 
-    <main class="main-content">
-        <div class="header">
-            <h1 id="titulo-pagina">Posição</h1>
-            <div class="header-acoes">
-                <span id="info-cotacao" class="sutil"></span>
-                <button id="btn-atualizar" class="btn">Atualizar Cotações</button>
+    <header class="topo">
+        <div class="topo-in">
+            <div class="marca">
+                <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6" fill="#1C2A22"></rect><path d="M6 18 L11 12 L15 15 L20 8" stroke="#3FB97A" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <span>Meus Investimentos</span>
+            </div>
+            <nav class="nav-principal" aria-label="Principal">
+                <a href="#" data-aba="visao" class="ativo">Visão geral</a>
+                <a href="#" data-aba="evolucao">Evolução</a>
+                <a href="#" data-aba="ordens">Ordens</a>
+                <a href="#" data-aba="proventos">Proventos</a>
+                <a href="#" data-aba="ativos">Ativos</a>
+                <a href="#" data-aba="carteiras">Carteiras</a>
+            </nav>
+            <div class="topo-dir">
+                <span id="info-cotacao" class="status"></span>
+                <button type="button" id="btn-atualizar" class="btn-icone" aria-label="Atualizar cotações agora" title="Atualizar cotações agora">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 11 A8 8 0 1 0 18 17"></path><path d="M20 4 V11 H13"></path></svg>
+                </button>
+                <button type="button" class="btn so-desktop" data-nova-ordem>+ Nova ordem</button>
+                <a href="#" data-aba="config" class="btn-icone so-desktop" aria-label="Configurações" title="Configurações">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2 V5 M12 19 V22 M2 12 H5 M19 12 H22 M4.9 4.9 L7 7 M17 17 L19.1 19.1 M4.9 19.1 L7 17 M17 7 L19.1 4.9"></path></svg>
+                </a>
+                <button type="button" id="btn-sair" class="btn-link so-desktop" title="">Sair</button>
             </div>
         </div>
-        <div id="aviso" class="aviso oculto"></div>
+    </header>
 
-        <!-- -------- POSIÇÃO -------- -->
-        <section id="aba-posicao" class="aba-conteudo ativa">
-            <div class="filtro">
-                <label>Carteira <select id="filtro-carteira-posicao" class="sel-carteira-todas"></select></label>
-                <label class="check"><input type="checkbox" id="mostrar-zeradas"> Mostrar posições zeradas</label>
+    <main class="conteudo">
+        <div class="titulo-linha">
+            <h1 id="titulo-pagina">Visão geral</h1>
+            <div id="barra-filtros" class="filtros">
+                <div id="seg-carteira" class="segmentado rolavel" role="group" aria-label="Carteira"></div>
+                <div id="seg-periodo" class="segmentado" role="group" aria-label="Período">
+                    <button type="button" data-periodo="30">1M</button>
+                    <button type="button" data-periodo="90">3M</button>
+                    <button type="button" data-periodo="180">6M</button>
+                    <button type="button" data-periodo="365">1A</button>
+                    <button type="button" data-periodo="0" class="ativo">Tudo</button>
+                </div>
             </div>
-            <div id="resumo-posicao" class="resumo"></div>
-            <div class="tabela-wrap">
-                <table class="dark-table">
-                    <thead><tr>
-                        <th>Carteira</th><th>Ativo</th><th class="num">Quant.</th>
-                        <th class="num">Preço Médio</th><th class="num">Cotação</th><th class="num">Var. dia</th>
-                        <th class="num">Custo</th><th class="num">Valor Atual</th>
-                        <th class="num">Resultado</th><th class="num">Rent.</th>
-                        <th class="num">% Cart.</th><th class="num">Proventos</th><th class="num">Lucro Realizado</th>
-                    </tr></thead>
-                    <tbody id="tb-posicao"></tbody>
-                </table>
+        </div>
+        <div id="aviso" class="aviso oculto" role="status"></div>
+
+        <!-- ================= VISÃO GERAL ================= -->
+        <section id="aba-visao" class="aba-conteudo ativa">
+            <div id="m-hero" class="m-hero so-celular"></div>
+            <section id="kpis" class="kpis so-desktop" aria-label="Resumo"></section>
+
+            <div class="linha-graficos">
+                <section class="painel grafico-principal">
+                    <div class="painel-topo">
+                        <h2>Patrimônio x valor investido</h2>
+                        <div class="legenda">
+                            <span><i class="leg-linha" style="background:#5B9DFF"></i>Patrimônio</span>
+                            <span><i class="leg-tracejado"></i>Investido</span>
+                        </div>
+                    </div>
+                    <div class="canvas-box"><canvas id="g-visao" role="img" aria-label="Gráfico de patrimônio e valor investido"></canvas></div>
+                </section>
+
+                <section class="painel alocacao">
+                    <div class="painel-topo">
+                        <h2>Alocação</h2>
+                        <div id="seg-agrupar" class="segmentado mini" role="group" aria-label="Agrupar por">
+                            <button type="button" data-agrupar="ativo" class="ativo">Ativo</button>
+                            <button type="button" data-agrupar="tipo">Tipo</button>
+                            <button type="button" data-agrupar="carteira">Carteira</button>
+                        </div>
+                    </div>
+                    <div id="aloc-barra" class="aloc-barra" role="img"></div>
+                    <div id="aloc-lista" class="aloc-lista"></div>
+                </section>
             </div>
+
+            <section id="m-carteiras" class="m-bloco so-celular"></section>
+            <section id="m-posicoes" class="m-bloco so-celular"></section>
+
+            <section class="painel sem-padding so-desktop">
+                <div class="painel-topo com-padding">
+                    <h2>Posições</h2>
+                    <div class="painel-acoes">
+                        <label class="check"><input type="checkbox" id="mostrar-zeradas"> Mostrar zeradas</label>
+                        <label class="inline">Buscar <input type="search" id="busca-posicao" placeholder="ticker ou nome"></label>
+                    </div>
+                </div>
+                <div class="tabela-wrap">
+                    <table class="dados tabela-posicoes">
+                        <thead><tr>
+                            <th>Ativo</th><th class="num">Quant.</th><th class="num">Preço médio</th><th class="num">Cotação</th>
+                            <th class="num">Dia</th><th class="num">Valor</th><th class="num">Resultado</th><th class="num">Rent.</th>
+                            <th class="num col-pct">% carteira</th><th class="num">Proventos</th><th class="num">Realizado</th>
+                        </tr></thead>
+                        <tbody id="tb-posicao"></tbody>
+                    </table>
+                </div>
+            </section>
         </section>
 
-        <!-- -------- EVOLUÇÃO -------- -->
+        <!-- ================= EVOLUÇÃO ================= -->
         <section id="aba-evolucao" class="aba-conteudo">
-            <div class="filtro">
-                <label>Carteira <select id="filtro-carteira-evolucao" class="sel-carteira-todas"></select></label>
-                <div class="periodos" id="periodos">
-                    <button data-periodo="30">1M</button>
-                    <button data-periodo="90">3M</button>
-                    <button data-periodo="180">6M</button>
-                    <button data-periodo="365">1A</button>
-                    <button data-periodo="0" class="ativo">Tudo</button>
-                </div>
-            </div>
-            <div id="resumo-evolucao" class="resumo"></div>
-
+            <section id="resumo-evolucao" class="kpis" aria-label="Resumo do período"></section>
             <div class="graficos">
-                <div class="card grafico largo">
-                    <h3>Patrimônio x Valor investido</h3>
-                    <div class="canvas-box"><canvas id="g-patrimonio"></canvas></div>
-                </div>
-                <div class="card grafico largo">
-                    <h3>Rentabilidade acumulada no período</h3>
-                    <div class="canvas-box"><canvas id="g-rentabilidade"></canvas></div>
-                </div>
-                <div class="card grafico">
-                    <h3>Alocação atual
-                        <select id="agrupar-alocacao" class="mini">
-                            <option value="ativo">por ativo</option>
-                            <option value="tipo">por tipo</option>
-                            <option value="carteira">por carteira</option>
-                        </select>
-                    </h3>
-                    <div class="canvas-box"><canvas id="g-alocacao"></canvas></div>
-                </div>
-                <div class="card grafico">
-                    <h3>Proventos por mês (12 meses)</h3>
-                    <div class="canvas-box"><canvas id="g-proventos"></canvas></div>
-                </div>
+                <section class="painel largo">
+                    <div class="painel-topo"><h2>Rentabilidade acumulada no período</h2></div>
+                    <div class="canvas-box alto"><canvas id="g-rentabilidade" role="img" aria-label="Gráfico de rentabilidade acumulada por carteira"></canvas></div>
+                </section>
+                <section class="painel">
+                    <div class="painel-topo"><h2>Resultado em aberto por ativo</h2></div>
+                    <div class="canvas-box"><canvas id="g-resultado" role="img" aria-label="Gráfico de resultado em aberto por ativo"></canvas></div>
+                </section>
+                <section class="painel">
+                    <div class="painel-topo"><h2>Proventos por mês (12 meses)</h2></div>
+                    <div class="canvas-box"><canvas id="g-proventos" role="img" aria-label="Gráfico de proventos por mês"></canvas></div>
+                </section>
             </div>
-            <p class="sutil">
+            <p class="sutil nota">
                 Cada ponto é o fechamento do dia, salvo automaticamente quando o pregão fecha com o site aberto
                 (ou na próxima vez que você abrir). O último ponto, "Agora", usa a cotação atual.
-                Dias em que o site não foi aberto ficam sem ponto.
+                A rentabilidade usa o método de cotas: aportes e vendas não distorcem o percentual.
             </p>
         </section>
 
-        <!-- -------- ORDENS -------- -->
+        <!-- ================= ORDENS ================= -->
         <section id="aba-ordens" class="aba-conteudo">
-            <form id="form-ordem" class="card form-grid">
-                <h3 id="titulo-form-ordem">Nova ordem</h3>
+            <form id="form-ordem" class="painel form-grid">
+                <h2 id="titulo-form-ordem">Nova ordem</h2>
                 <input type="hidden" id="ordem-id">
                 <label>Carteira <select id="ordem-carteira" class="sel-carteira" required></select></label>
                 <label class="busca-ativo">Ativo
@@ -136,9 +171,9 @@
                     </select>
                 </label>
                 <label>Data <input type="date" id="ordem-data" required></label>
-                <label>Quantidade <input type="number" id="ordem-qtd" step="any" min="0" required></label>
-                <label>Preço unitário <input type="number" id="ordem-preco" step="0.0001" min="0" required></label>
-                <label>Taxas (R$) <input type="number" id="ordem-taxas" step="0.01" min="0" value="0"></label>
+                <label>Quantidade <input type="number" id="ordem-qtd" step="any" min="0" inputmode="decimal" required></label>
+                <label>Preço unitário <input type="number" id="ordem-preco" step="0.0001" min="0" inputmode="decimal" required></label>
+                <label>Taxas (R$) <input type="number" id="ordem-taxas" step="0.01" min="0" value="0" inputmode="decimal"></label>
                 <label>Total <input type="text" id="ordem-total" readonly tabindex="-1"></label>
                 <p id="ordem-info" class="sutil largo"></p>
                 <div class="form-botoes">
@@ -146,25 +181,30 @@
                     <button type="button" class="btn btn-sec" data-cancelar="ordem">Cancelar</button>
                 </div>
             </form>
-            <div class="filtro">
-                <label>Carteira <select id="filtro-carteira-ordens" class="sel-carteira-todas"></select></label>
-                <label>Ativo <input type="text" id="filtro-ativo-ordens" placeholder="filtrar ticker"></label>
-            </div>
-            <div class="tabela-wrap">
-                <table class="dark-table">
-                    <thead><tr>
-                        <th>Data</th><th>Carteira</th><th>Ativo</th><th>Tipo</th>
-                        <th class="num">Quant.</th><th class="num">Preço</th><th class="num">Taxas</th><th class="num">Total</th><th></th>
-                    </tr></thead>
-                    <tbody id="tb-ordens"></tbody>
-                </table>
-            </div>
+            <section class="painel sem-padding">
+                <div class="painel-topo com-padding">
+                    <h2>Histórico de ordens</h2>
+                    <div class="painel-acoes">
+                        <label class="inline">Carteira <select id="filtro-carteira-ordens" class="sel-carteira-todas"></select></label>
+                        <label class="inline">Ativo <input type="search" id="filtro-ativo-ordens" placeholder="ticker"></label>
+                    </div>
+                </div>
+                <div class="tabela-wrap">
+                    <table class="dados">
+                        <thead><tr>
+                            <th>Data</th><th>Carteira</th><th>Ativo</th><th>Tipo</th>
+                            <th class="num">Quant.</th><th class="num">Preço</th><th class="num">Taxas</th><th class="num">Total</th><th></th>
+                        </tr></thead>
+                        <tbody id="tb-ordens"></tbody>
+                    </table>
+                </div>
+            </section>
         </section>
 
-        <!-- -------- PROVENTOS -------- -->
+        <!-- ================= PROVENTOS ================= -->
         <section id="aba-proventos" class="aba-conteudo">
-            <form id="form-provento" class="card form-grid">
-                <h3 id="titulo-form-provento">Novo provento</h3>
+            <form id="form-provento" class="painel form-grid">
+                <h2 id="titulo-form-provento">Novo provento</h2>
                 <input type="hidden" id="provento-id">
                 <label>Carteira <select id="provento-carteira" class="sel-carteira" required></select></label>
                 <label class="busca-ativo">Ativo
@@ -180,26 +220,29 @@
                     </select>
                 </label>
                 <label>Data pagamento <input type="date" id="provento-data" required></label>
-                <label>Valor líquido (R$) <input type="number" id="provento-valor" step="0.01" min="0" required></label>
+                <label>Valor líquido (R$) <input type="number" id="provento-valor" step="0.01" min="0" inputmode="decimal" required></label>
                 <div class="form-botoes">
                     <button type="submit" class="btn">Salvar</button>
                     <button type="button" class="btn btn-sec" data-cancelar="provento">Cancelar</button>
                 </div>
             </form>
-            <div class="tabela-wrap">
-                <table class="dark-table">
-                    <thead><tr>
-                        <th>Pagamento</th><th>Carteira</th><th>Ativo</th><th>Tipo</th><th class="num">Valor</th><th></th>
-                    </tr></thead>
-                    <tbody id="tb-proventos"></tbody>
-                </table>
-            </div>
+            <section class="painel sem-padding">
+                <div class="painel-topo com-padding"><h2>Proventos recebidos</h2></div>
+                <div class="tabela-wrap">
+                    <table class="dados">
+                        <thead><tr>
+                            <th>Pagamento</th><th>Carteira</th><th>Ativo</th><th>Tipo</th><th class="num">Valor</th><th></th>
+                        </tr></thead>
+                        <tbody id="tb-proventos"></tbody>
+                    </table>
+                </div>
+            </section>
         </section>
 
-        <!-- -------- ATIVOS -------- -->
+        <!-- ================= ATIVOS ================= -->
         <section id="aba-ativos" class="aba-conteudo">
-            <form id="form-ativo" class="card form-grid">
-                <h3 id="titulo-form-ativo">Novo ativo</h3>
+            <form id="form-ativo" class="painel form-grid">
+                <h2 id="titulo-form-ativo">Novo ativo</h2>
                 <input type="hidden" id="ativo-id">
                 <label>Ticker <input type="text" id="ativo-ticker" maxlength="20" placeholder="PETR4" required></label>
                 <label class="duplo">Nome
@@ -219,18 +262,20 @@
                     <button type="button" class="btn btn-sec" data-cancelar="ativo">Cancelar</button>
                 </div>
             </form>
-            <div class="tabela-wrap">
-                <table class="dark-table">
-                    <thead><tr><th>Ticker</th><th>Nome</th><th>Tipo</th><th class="num">Cotação</th><th class="num">Ordens</th><th></th></tr></thead>
-                    <tbody id="tb-ativos"></tbody>
-                </table>
-            </div>
+            <section class="painel sem-padding">
+                <div class="tabela-wrap">
+                    <table class="dados">
+                        <thead><tr><th>Ticker</th><th>Nome</th><th>Tipo</th><th class="num">Cotação</th><th class="num">Ordens</th><th></th></tr></thead>
+                        <tbody id="tb-ativos"></tbody>
+                    </table>
+                </div>
+            </section>
         </section>
 
-        <!-- -------- CARTEIRAS -------- -->
+        <!-- ================= CARTEIRAS ================= -->
         <section id="aba-carteiras" class="aba-conteudo">
-            <form id="form-carteira" class="card form-grid">
-                <h3 id="titulo-form-carteira">Nova carteira</h3>
+            <form id="form-carteira" class="painel form-grid">
+                <h2 id="titulo-form-carteira">Nova carteira</h2>
                 <input type="hidden" id="carteira-id">
                 <label>Nome <input type="text" id="carteira-nome" maxlength="100" required></label>
                 <label class="duplo">Descrição <input type="text" id="carteira-descricao"></label>
@@ -239,18 +284,20 @@
                     <button type="button" class="btn btn-sec" data-cancelar="carteira">Cancelar</button>
                 </div>
             </form>
-            <div class="tabela-wrap">
-                <table class="dark-table">
-                    <thead><tr><th>Carteira</th><th>Descrição</th><th class="num">Ativos em posição</th><th class="num">Patrimônio</th><th class="num">Fechamentos salvos</th><th></th></tr></thead>
-                    <tbody id="tb-carteiras"></tbody>
-                </table>
-            </div>
+            <section class="painel sem-padding">
+                <div class="tabela-wrap">
+                    <table class="dados">
+                        <thead><tr><th>Carteira</th><th>Descrição</th><th class="num">Ativos em posição</th><th class="num">Patrimônio</th><th class="num">Fechamentos salvos</th><th></th></tr></thead>
+                        <tbody id="tb-carteiras"></tbody>
+                    </table>
+                </div>
+            </section>
         </section>
 
-        <!-- -------- CONFIGURAÇÕES -------- -->
+        <!-- ================= CONFIGURAÇÕES ================= -->
         <section id="aba-config" class="aba-conteudo">
-            <form id="form-config" class="card form-grid">
-                <h3>Cotações (brapi.dev)</h3>
+            <form id="form-config" class="painel form-grid">
+                <h2>Cotações (brapi.dev)</h2>
                 <label class="largo">Token da brapi
                     <input type="password" id="cfg-token" placeholder="cole aqui o token gerado em brapi.dev/dashboard" autocomplete="off">
                 </label>
@@ -263,8 +310,41 @@
                     <button type="button" id="btn-limpar-cache" class="btn btn-sec">Limpar cache de cotações</button>
                 </div>
             </form>
+            <section class="painel so-celular">
+                <div class="painel-topo"><h2>Sessão</h2></div>
+                <p class="sutil" id="usuario-email"></p>
+                <button type="button" class="btn btn-sec" data-sair style="margin-top:12px">Sair</button>
+            </section>
         </section>
     </main>
+
+    <!-- ================= NAVEGAÇÃO DO CELULAR ================= -->
+    <nav class="nav-celular so-celular" aria-label="Navegação">
+        <a href="#" data-aba="visao" class="ativo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11 L12 4 L21 11 V20 H3 Z"></path></svg>Início</a>
+        <a href="#" data-aba="evolucao">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 17 L9 11 L13 15 L21 7"></path></svg>Evolução</a>
+        <span class="nav-centro">
+            <button type="button" data-nova-ordem aria-label="Nova ordem">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5 V19 M5 12 H19"></path></svg>
+            </button>
+        </span>
+        <a href="#" data-aba="ordens">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 4 H19 V20 H5 Z M9 9 H15 M9 13 H15 M9 17 H12"></path></svg>Ordens</a>
+        <button type="button" id="btn-mais" aria-expanded="false" aria-controls="menu-mais">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7 H20 M4 12 H20 M4 17 H20"></path></svg>Mais</button>
+    </nav>
+
+    <div id="menu-mais" class="folha oculto">
+        <div class="folha-fundo" data-fechar-mais></div>
+        <div class="folha-conteudo" role="dialog" aria-label="Mais opções">
+            <a href="#" data-aba="proventos">Proventos</a>
+            <a href="#" data-aba="ativos">Ativos</a>
+            <a href="#" data-aba="carteiras">Carteiras</a>
+            <a href="#" data-aba="config">Configurações</a>
+            <button type="button" data-sair>Sair</button>
+        </div>
+    </div>
 </div>
 
 <script src="app.js"></script>

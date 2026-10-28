@@ -1,5 +1,5 @@
 // ====================================================================
-// app.js — Portal de Ações v2 (Supabase + GitHub Pages)
+// app.js — Portal de Ações v3 (Supabase + GitHub Pages) — layout A (computador) + C (celular)
 // --------------------------------------------------------------------
 //  Cadastros: Ativos, Carteiras · Lançamentos: Ordens, Proventos
 //  Posição calculada a partir das ordens (preço médio padrão Receita)
@@ -12,7 +12,7 @@ const $ = (id) => document.getElementById(id);
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const num = (v, d = 2) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
 const qtdFmt = (v) => Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
-const pct = (v) => (v >= 0 ? '+' : '') + num(v) + '%';
+const pct = (v) => (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + num(Math.abs(v)) + '%';
 const classe = (v) => (v > 0 ? 'lucro' : v < 0 ? 'prejuizo' : '');
 const dataBR = (iso) => iso ? iso.slice(0, 10).split('-').reverse().join('/') : '';
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -45,10 +45,19 @@ const ativoDe = (id) => DB.ativos.find(a => a.id === id);
 const carteiraDe = (id) => DB.carteiras.find(c => c.id === id);
 
 const TITULOS = {
-    posicao: 'Posição', evolucao: 'Evolução das Carteiras', ordens: 'Ordens', proventos: 'Proventos',
+    visao: 'Visão geral', evolucao: 'Evolução', ordens: 'Ordens', proventos: 'Proventos',
     ativos: 'Ativos', carteiras: 'Carteiras', config: 'Configurações'
 };
-let abaAtual = 'posicao';
+let abaAtual = 'visao';
+
+// filtros compartilhados por Visão geral e Evolução
+let filtroCarteira = '';   // '' = todas
+let periodoDias = 0;       // 0 = tudo
+let agruparAloc = 'ativo';
+
+// cores fixas por posição na lista (gráficos e alocação)
+const CORES = ['#5B9DFF', '#3FB97A', '#E8A23A', '#B58CF0', '#F2737B', '#4FC3D9', '#C9D46A', '#C49A85', '#EC7FB4', '#90A4AE'];
+const cidsEscopo = () => new Set(filtroCarteira ? [filtroCarteira] : DB.carteiras.map(c => c.id));
 
 // ====================================================================
 // LOGIN
@@ -61,7 +70,6 @@ $('form-login').addEventListener('submit', async (e) => {
     });
     if (error) $('login-erro').textContent = 'Falha no login: ' + error.message;
 });
-$('btn-sair').addEventListener('click', () => sb.auth.signOut());
 
 sb.auth.onAuthStateChange((_evento, sessao) => {
     if (sessao) {
@@ -78,18 +86,70 @@ sb.auth.onAuthStateChange((_evento, sessao) => {
 // ====================================================================
 // NAVEGAÇÃO
 // ====================================================================
-document.querySelectorAll('.sidebar a[data-aba]').forEach(a => a.addEventListener('click', (e) => {
-    e.preventDefault();
-    mostrarAba(a.dataset.aba);
-}));
-
 function mostrarAba(aba) {
     abaAtual = aba;
     document.querySelectorAll('.aba-conteudo').forEach(el => el.classList.remove('ativa'));
-    document.querySelectorAll('.sidebar a[data-aba]').forEach(el => el.classList.toggle('ativo', el.dataset.aba === aba));
+    document.querySelectorAll('.nav-principal a[data-aba], .nav-celular a[data-aba]')
+        .forEach(el => el.classList.toggle('ativo', el.dataset.aba === aba));
     $('aba-' + aba).classList.add('ativa');
     $('titulo-pagina').textContent = TITULOS[aba];
-    if (aba === 'evolucao') renderEvolucao();   // gráfico precisa estar visível para medir o tamanho
+    $('barra-filtros').classList.toggle('oculto', aba !== 'visao' && aba !== 'evolucao');
+    fecharMais();
+    window.scrollTo(0, 0);
+    renderGraficosVisiveis();   // gráfico precisa estar visível para medir o tamanho
+}
+
+function renderGraficosVisiveis() {
+    if (abaAtual === 'visao') renderVisao();
+    if (abaAtual === 'evolucao') renderEvolucao();
+}
+
+function abrirMais() { $('menu-mais').classList.remove('oculto'); $('btn-mais').setAttribute('aria-expanded', 'true'); }
+function fecharMais() { $('menu-mais').classList.add('oculto'); $('btn-mais').setAttribute('aria-expanded', 'false'); }
+$('btn-mais').addEventListener('click', abrirMais);
+
+// cliques de navegação (menu do topo, barra do celular, menu "Mais", engrenagem)
+document.addEventListener('click', (e) => {
+    const link = e.target.closest('[data-aba]');
+    if (link) { e.preventDefault(); mostrarAba(link.dataset.aba); return; }
+    if (e.target.closest('[data-nova-ordem]')) {
+        mostrarAba('ordens');
+        cancelarEdicao('ordem');
+        $('ordem-ativo-busca').focus();
+        return;
+    }
+    if (e.target.closest('[data-fechar-mais]')) { fecharMais(); return; }
+    if (e.target.closest('#btn-sair, [data-sair]')) { fecharMais(); sb.auth.signOut(); return; }
+
+    const bCart = e.target.closest('[data-carteira-filtro]');
+    if (bCart) {
+        filtroCarteira = bCart.dataset.carteiraFiltro;
+        desenharFiltroCarteira();
+        renderGraficosVisiveis();
+        return;
+    }
+    const bPer = e.target.closest('#seg-periodo [data-periodo]');
+    if (bPer) {
+        periodoDias = Number(bPer.dataset.periodo);
+        document.querySelectorAll('#seg-periodo button').forEach(b => b.classList.toggle('ativo', b === bPer));
+        renderGraficosVisiveis();
+        return;
+    }
+    const bAgr = e.target.closest('#seg-agrupar [data-agrupar]');
+    if (bAgr) {
+        agruparAloc = bAgr.dataset.agrupar;
+        document.querySelectorAll('#seg-agrupar button').forEach(b => b.classList.toggle('ativo', b === bAgr));
+        renderVisao();
+    }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharMais(); });
+
+function desenharFiltroCarteira() {
+    const itens = [{ id: '', nome: 'Todas' }, ...DB.carteiras];
+    if (filtroCarteira && !DB.carteiras.some(c => c.id === filtroCarteira)) filtroCarteira = '';
+    $('seg-carteira').innerHTML = itens.map(c =>
+        `<button type="button" data-carteira-filtro="${c.id}" class="${c.id === filtroCarteira ? 'ativo' : ''}">${esc(c.nome)}</button>`
+    ).join('');
 }
 
 function aviso(msg) {
@@ -131,13 +191,12 @@ async function recarregarTudo(forcarCotacao) {
 }
 
 function renderTudo() {
-    renderPosicao();
     renderOrdens();
     renderProventos();
     renderAtivos();
     renderCarteiras();
     atualizarInfoOrdem();
-    if (abaAtual === 'evolucao') renderEvolucao();
+    renderGraficosVisiveis();
 }
 
 $('btn-atualizar').addEventListener('click', () => recarregarTudo(true));
@@ -242,14 +301,19 @@ function pregaoAberto() {
     return a.diaUtil && a.minutos >= 10 * 60 && a.minutos < FECHAMENTO_MIN;
 }
 
+const horaSP = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+let horaCotacao = '';   // usado também no topo da Visão geral do celular
+
 function atualizarInfoCotacao() {
+    const el = $('info-cotacao');
     const horarios = tickersEmUso().map(t => COTACOES[t]?.em).filter(Boolean);
-    if (!horarios.length) { $('info-cotacao').textContent = ''; return; }
-    const hora = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+    if (!horarios.length) { el.textContent = ''; horaCotacao = ''; return; }
     const maisAntiga = Math.min(...horarios);
-    $('info-cotacao').textContent = janelaAutomatica()
-        ? `Cotações de ${hora(maisAntiga)} · próxima ~${hora(maisAntiga + intervaloAutoMs())} (automática)`
-        : `Cotações de ${hora(maisAntiga)} · pregão fechado`;
+    horaCotacao = horaSP(maisAntiga);
+    const auto = janelaAutomatica();
+    el.classList.toggle('auto', auto);
+    el.textContent = `Cotações ${horaCotacao} · ${auto ? 'automática' : 'pregão fechado'}`;
+    el.title = auto ? `Próxima atualização por volta de ${horaSP(maisAntiga + intervaloAutoMs())}` : '';
 }
 
 let autoRodando = false;
@@ -260,10 +324,9 @@ async function cicloAutomatico() {
     try {
         await atualizarCotacoes(false);       // só busca o que venceu
         await salvarFechamentos();
-        renderPosicao();
         renderAtivos();
         renderCarteiras();
-        if (abaAtual === 'evolucao') renderEvolucao();
+        renderGraficosVisiveis();
     } catch (err) {
         console.error('Atualização automática falhou:', err);
     } finally {
@@ -393,91 +456,16 @@ function ultimoPrecoConhecido(ticker, ateData) {
 }
 
 // ====================================================================
-// TELA: POSIÇÃO
+// SÉRIE DIÁRIA (fechamentos salvos + ponto "Agora")
 // ====================================================================
-$('filtro-carteira-posicao').addEventListener('change', renderPosicao);
-$('mostrar-zeradas').addEventListener('change', renderPosicao);
-
-function precoAtual(ticker, pm) {
-    const c = COTACOES[normTicker(ticker)];
-    return c ? c.preco : null;
-}
-
-function renderPosicao() {
-    const filtro = $('filtro-carteira-posicao').value;
-    const zeradas = $('mostrar-zeradas').checked;
-    const lista = [...calcularPosicoes().values()]
-        .filter(p => !filtro || p.carteira_id === filtro)
-        .filter(p => zeradas || p.qtd > 0);
-
-    const nomeCart = (p) => carteiraDe(p.carteira_id)?.nome || '';
-    const tick = (p) => ativoDe(p.ativo_id)?.ticker || '';
-    lista.sort((x, y) => (nomeCart(x) + tick(x)).localeCompare(nomeCart(y) + tick(y)));
-
-    // total por carteira para a coluna "% Cart."
-    const totCart = {};
-    for (const p of lista) {
-        const pa = precoAtual(tick(p));
-        totCart[p.carteira_id] = (totCart[p.carteira_id] || 0) + p.qtd * (pa ?? p.pm);
-    }
-
-    let tCusto = 0, tAtual = 0, tProv = 0, tReal = 0, semCotacao = false;
-    const linhas = lista.map(p => {
-        const t = tick(p);
-        const cot = COTACOES[normTicker(t)];
-        const valorAtual = cot ? p.qtd * cot.preco : null;
-        const resultado = valorAtual != null ? valorAtual - p.custo : null;
-        const rent = resultado != null && p.custo > 0 ? (resultado / p.custo) * 100 : null;
-        const part = totCart[p.carteira_id] ? (p.qtd * (cot?.preco ?? p.pm)) / totCart[p.carteira_id] * 100 : 0;
-
-        tCusto += p.custo; tProv += p.proventos; tReal += p.realizado;
-        if (valorAtual != null) tAtual += valorAtual; else if (p.qtd > 0) { semCotacao = true; tAtual += p.custo; }
-
-        const alerta = p.alerta ? ' <span title="Existe venda maior que a posição na data — confira as ordens">⚠️</span>' : '';
-        return `<tr class="${p.qtd === 0 ? 'zerada' : ''}">
-            <td>${esc(nomeCart(p))}</td>
-            <td><strong>${esc(t)}</strong>${alerta}</td>
-            <td class="num">${qtdFmt(p.qtd)}</td>
-            <td class="num">${p.qtd ? brl.format(p.pm) : '—'}</td>
-            <td class="num">${cot ? brl.format(cot.preco) : '—'}</td>
-            <td class="num ${cot ? classe(cot.variacao) : ''}">${cot ? pct(cot.variacao) : '—'}</td>
-            <td class="num">${brl.format(p.custo)}</td>
-            <td class="num">${valorAtual != null ? brl.format(valorAtual) : '—'}</td>
-            <td class="num ${classe(resultado)}">${resultado != null ? brl.format(resultado) : '—'}</td>
-            <td class="num ${classe(rent)}">${rent != null ? pct(rent) : '—'}</td>
-            <td class="num">${p.qtd ? num(part, 1) + '%' : '—'}</td>
-            <td class="num lucro">${brl.format(p.proventos)}</td>
-            <td class="num ${classe(p.realizado)}">${brl.format(p.realizado)}</td>
-        </tr>`;
-    });
-
-    $('tb-posicao').innerHTML = linhas.join('') ||
-        '<tr><td colspan="13" class="vazio">Nenhuma posição. Cadastre uma carteira, um ativo e lance uma ordem de compra.</td></tr>';
-
-    const resNaoReal = tAtual - tCusto;
-    const rentTotal = tCusto > 0 ? (resNaoReal / tCusto) * 100 : 0;
-    $('resumo-posicao').innerHTML = `
-        <div class="item"><span>Custo total</span><strong>${brl.format(tCusto)}</strong></div>
-        <div class="item"><span>Valor atual${semCotacao ? ' (parcial)' : ''}</span><strong>${brl.format(tAtual)}</strong></div>
-        <div class="item"><span>Resultado não realizado</span><strong class="${classe(resNaoReal)}">${brl.format(resNaoReal)}</strong><small class="${classe(rentTotal)}">${pct(rentTotal)}</small></div>
-        <div class="item"><span>Proventos recebidos</span><strong class="lucro">${brl.format(tProv)}</strong></div>
-        <div class="item"><span>Lucro realizado (vendas)</span><strong class="${classe(tReal)}">${brl.format(tReal)}</strong></div>`;
-}
-
-// ====================================================================
-// TELA: EVOLUÇÃO
-// ====================================================================
-let periodoDias = 0;
 const GRAFICOS = {};
-const CORES = ['#4caf50', '#42a5f5', '#ffb74d', '#ab47bc', '#ef5350', '#26c6da', '#d4e157', '#8d6e63', '#ec407a', '#78909c'];
-
-$('filtro-carteira-evolucao').addEventListener('change', renderEvolucao);
-$('agrupar-alocacao').addEventListener('change', renderEvolucao);
-document.querySelectorAll('#periodos button').forEach(b => b.addEventListener('click', () => {
-    document.querySelectorAll('#periodos button').forEach(x => x.classList.toggle('ativo', x === b));
-    periodoDias = Number(b.dataset.periodo);
-    renderEvolucao();
-}));
+if (window.Chart) {
+    Chart.defaults.color = '#8B95A3';
+    Chart.defaults.borderColor = '#1D232B';
+    Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
+}
+$('mostrar-zeradas').addEventListener('change', () => renderVisao());
+$('busca-posicao').addEventListener('input', () => renderVisao());
 
 // Fluxo de caixa de um conjunto de carteiras entre (de, ate]:
 //   aportes = dinheiro colocado em compras · resgates = dinheiro recebido em vendas
@@ -536,17 +524,9 @@ function montarSerie(cids, datas, precosPorData, posPorData) {
     return pontos;
 }
 
-function renderEvolucao() {
-    if (abaAtual !== 'evolucao') return;
-    if (typeof Chart === 'undefined') { aviso('Biblioteca de gráficos não carregou (verifique a internet).'); return; }
-
-    const filtro = $('filtro-carteira-evolucao').value;
-    const cartsEscopo = filtro ? DB.carteiras.filter(c => c.id === filtro) : DB.carteiras;
-    const cidsEscopo = new Set(cartsEscopo.map(c => c.id));
-
-    // datas com fechamento salvo
-    const datasSet = new Set(DB.fechamentos.filter(f => cidsEscopo.has(f.carteira_id)).map(f => f.data));
-    let datas = [...datasSet].sort();
+// Junta o que a série precisa: datas com fechamento, preços de cada data, posições e início do período
+function montarBase(cids) {
+    const datas = [...new Set(DB.fechamentos.filter(f => cids.has(f.carteira_id)).map(f => f.data))].sort();
 
     // preços por data: une os preços gravados de todas as carteiras naquele dia (+ último conhecido)
     const precosPorData = new Map();
@@ -571,111 +551,278 @@ function renderEvolucao() {
     const posPorData = new Map();
     for (const d of datas) posPorData.set(d, calcularPosicoes(d === 'AGORA' ? null : d));
 
-    const serieTotal = montarSerie(cidsEscopo, datas, precosPorData, posPorData);
-
     // recorte do período
     let ini = 0;
     if (periodoDias > 0) {
         const corte = somaDias(hoje, -periodoDias);
-        ini = serieTotal.findIndex(p => p.data === 'AGORA' || p.data >= corte);
-        if (ini < 0) ini = serieTotal.length;
+        ini = datas.findIndex(d => d === 'AGORA' || d >= corte);
+        if (ini < 0) ini = datas.length;
     }
-    const visiveis = serieTotal.slice(ini);
-    const rotulos = visiveis.map(p => p.data === 'AGORA' ? 'Agora' : dataBR(p.data).slice(0, 5));
-    const rotulosLongos = visiveis.map(p => p.data === 'AGORA' ? 'Agora' : dataBR(p.data));
+    return { datas, precosPorData, posPorData, ini };
+}
 
-    // ---------- cards ----------
-    // base da rentabilidade = cota no fechamento anterior ao período (ou 1 = preço pago, se o período começa no início)
-    const cotaBase = (serie) => ini > 0 ? serie[ini - 1].cota : 1;
-    const ult = visiveis.at(-1);
-    const penult = visiveis.length > 1 ? visiveis.at(-2) : (ini > 0 ? serieTotal[ini - 1] : null);
-    const rentPeriodo = ult ? (ult.cota / cotaBase(serieTotal) - 1) * 100 : 0;
-    const provPeriodo = visiveis.reduce((s, p) => s + p.P, 0);
-    const varDia = ult && penult ? ult.r * 100 : null;
-    const varDiaRs = ult && penult ? ult.V + ult.P - penult.V - ult.F : null;
-    const rotuloDia = ult?.data === 'AGORA' ? 'Hoje (desde o último fechamento)' : 'Último fechamento';
-
-    $('resumo-evolucao').innerHTML = !visiveis.length
-        ? '<div class="item"><span>Sem dados</span><strong>—</strong><small>Os fechamentos são gravados automaticamente a cada dia de pregão.</small></div>'
-        : `<div class="item"><span>Patrimônio</span><strong>${brl.format(ult.V)}</strong></div>
-           <div class="item"><span>Valor investido</span><strong>${brl.format(ult.I)}</strong></div>
-           <div class="item"><span>Resultado em aberto</span><strong class="${classe(ult.V - ult.I)}">${brl.format(ult.V - ult.I)}</strong></div>
-           <div class="item"><span>${rotuloDia}</span><strong class="${classe(varDia)}">${varDia != null ? pct(varDia) : '—'}</strong>
-                <small class="${classe(varDiaRs)}">${varDiaRs != null ? brl.format(varDiaRs) : ''}</small></div>
-           <div class="item"><span>Rentabilidade no período</span><strong class="${classe(rentPeriodo)}">${pct(rentPeriodo)}</strong>
-                <small class="lucro">${provPeriodo ? 'proventos ' + brl.format(provPeriodo) : ''}</small></div>`;
-
-    // ---------- gráfico: patrimônio x investido ----------
-    desenhar('g-patrimonio', {
-        type: 'line',
-        data: {
-            labels: rotulos,
-            datasets: [
-                { label: 'Patrimônio', data: visiveis.map(p => p.ativo ? +p.V.toFixed(2) : null), borderColor: CORES[0], backgroundColor: 'rgba(76,175,80,.12)', fill: true, tension: .25, pointRadius: 2 },
-                { label: 'Valor investido', data: visiveis.map(p => p.ativo ? +p.I.toFixed(2) : null), borderColor: '#9e9e9e', borderDash: [6, 4], fill: false, stepped: true, pointRadius: 0 }
-            ]
-        },
-        options: opcoesLinha(v => brl.format(v), rotulosLongos)
-    });
-
-    // ---------- gráfico: rentabilidade por carteira ----------
-    const datasetsRent = [];
-    const linhaRent = (serie, label, cor, tracejado) => {
-        const s = serie.slice(ini);
-        const base = cotaBase(serie);
-        datasetsRent.push({
-            label, borderColor: cor, backgroundColor: cor, tension: .25, pointRadius: 2, borderWidth: tracejado ? 3 : 2,
-            borderDash: tracejado ? [6, 4] : [],
-            data: s.map(p => p.ativo && base ? +((p.cota / base - 1) * 100).toFixed(2) : null)
-        });
+// Série + números do período para um conjunto de carteiras
+function resumoPeriodo(cids, base = montarBase(cids)) {
+    const serie = montarSerie(cids, base.datas, base.precosPorData, base.posPorData);
+    const ini = base.ini;
+    const vis = serie.slice(ini);
+    // base da rentabilidade = cota no fechamento anterior ao período (ou 1 = preço pago)
+    const cotaBase = ini > 0 ? serie[ini - 1].cota : 1;
+    const ult = vis.at(-1);
+    const penult = vis.length > 1 ? vis.at(-2) : (ini > 0 ? serie[ini - 1] : null);
+    return {
+        base, serie, ini, vis, cotaBase, ult,
+        rent: ult && ult.ativo ? (ult.cota / cotaBase - 1) * 100 : null,
+        varDia: ult && penult && penult.ativo ? ult.r * 100 : null,
+        varDiaRs: ult && penult && penult.ativo ? ult.V + ult.P - penult.V - ult.F : null,
+        provPeriodo: vis.reduce((s, p) => s + p.P, 0),
+        inicio: vis.find(p => p.ativo)?.data,
+        rotulos: vis.map(p => p.data === 'AGORA' ? 'Agora' : dataBR(p.data).slice(0, 5)),
+        rotulosLongos: vis.map(p => p.data === 'AGORA' ? 'Agora (cotação atual)' : dataBR(p.data))
     };
-    cartsEscopo.forEach((c, i) => linhaRent(montarSerie(new Set([c.id]), datas, precosPorData, posPorData), c.nome, CORES[i % CORES.length], false));
-    if (cartsEscopo.length > 1) linhaRent(serieTotal, 'Total', '#ffffff', true);
+}
 
+// ---------- pequenos formatadores ----------
+const sinalBrl = (v) => (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + brl.format(Math.abs(v));
+const seta = (v) => (v > 0 ? '▲ ' : v < 0 ? '▼ ' : '');
+const brlCurto = (v) => Math.abs(v) >= 1000 ? 'R$ ' + num(v / 1000, Math.abs(v) >= 10000 ? 0 : 1) + ' mil' : brl.format(v);
+const kpi = (rotulo, valor, sub, clsValor = '', clsSub = '') =>
+    `<div class="kpi"><span class="rotulo">${rotulo}</span><span class="valor ${clsValor}">${valor}</span><span class="sub ${clsSub}">${sub}</span></div>`;
+const valorDe = (p) => {
+    const c = COTACOES[normTicker(ativoDe(p.ativo_id)?.ticker)];
+    return { cot: c, valor: p.qtd * (c ? c.preco : p.pm) };
+};
+
+// ====================================================================
+// TELA: VISÃO GERAL
+// ====================================================================
+function renderVisao() {
+    if (abaAtual !== 'visao') return;
+    const cids = cidsEscopo();
+    const posicoes = [...calcularPosicoes().values()].filter(p => cids.has(p.carteira_id));
+
+    let custo = 0, valor = 0, prov = 0, real = 0, parcial = false;
+    for (const p of posicoes) {
+        custo += p.custo; prov += p.proventos; real += p.realizado;
+        if (p.qtd > 0) { const v = valorDe(p); valor += v.valor; if (!v.cot) parcial = true; }
+    }
+    const res = valor - custo, resPct = custo > 0 ? res / custo * 100 : 0;
+    const R = resumoPeriodo(cids);
+    const rotuloDia = R.ult?.data === 'AGORA' ? 'Hoje' : 'Último fechamento';
+
+    // ---------- números do topo (computador) ----------
+    $('kpis').innerHTML =
+        kpi('Patrimônio', brl.format(valor), `investido ${brl.format(custo)}${parcial ? ' · cotação parcial' : ''}`) +
+        kpi('Resultado em aberto', sinalBrl(res), `${seta(res)}${pct(resPct)} sobre o custo`, classe(res), classe(res)) +
+        kpi(rotuloDia, R.varDia != null ? pct(R.varDia) : '—',
+            R.varDiaRs != null ? `${seta(R.varDiaRs)}${sinalBrl(R.varDiaRs)} ${R.ult.data === 'AGORA' ? 'desde o fechamento' : 'no dia'}` : 'aguardando o 1º fechamento',
+            classe(R.varDia), classe(R.varDiaRs)) +
+        kpi('Rentabilidade', R.rent != null ? pct(R.rent) : '—',
+            R.inicio ? `desde ${dataBR(R.inicio === 'AGORA' ? hojeSP() : R.inicio)} · método de cotas` : 'sem fechamentos no período', classe(R.rent)) +
+        kpi(periodoDias ? 'Proventos no período' : 'Proventos', brl.format(periodoDias ? R.provPeriodo : prov),
+            `lucro realizado ${sinalBrl(real)}`);
+
+    // ---------- topo do celular ----------
+    $('m-hero').innerHTML = `
+        <span class="rotulo">Patrimônio${horaCotacao ? ' · cotações ' + horaCotacao : ''}</span>
+        <span class="grande">${brl.format(valor)}</span>
+        <div class="chips">
+            <span class="chip ${classe(res)}">${seta(res)}${sinalBrl(res)} (${pct(resPct)})</span>
+            ${R.varDia != null ? `<span class="chip ${classe(R.varDia)}">${seta(R.varDia)}${rotuloDia.toLowerCase()} ${pct(R.varDia)}</span>` : ''}
+            ${R.rent != null ? `<span class="chip">rent. ${pct(R.rent)}</span>` : ''}
+        </div>`;
+
+    // ---------- gráfico patrimônio x investido ----------
+    if (window.Chart) {
+        desenhar('g-visao', {
+            type: 'line',
+            data: {
+                labels: R.rotulos,
+                datasets: [
+                    { label: 'Patrimônio', data: R.vis.map(p => p.ativo ? +p.V.toFixed(2) : null), borderColor: '#5B9DFF', backgroundColor: 'rgba(91,157,255,.12)', fill: true, tension: .25, pointRadius: R.vis.length > 60 ? 0 : 2, borderWidth: 2.2 },
+                    { label: 'Investido', data: R.vis.map(p => p.ativo ? +p.I.toFixed(2) : null), borderColor: '#8B95A3', borderDash: [5, 4], fill: false, stepped: true, pointRadius: 0, borderWidth: 1.5 }
+                ]
+            },
+            options: opcoesLinha(brlCurto, R.rotulosLongos, (v) => brl.format(v), false)
+        });
+    }
+
+    // ---------- alocação ----------
+    const grupos = new Map();
+    for (const p of posicoes) {
+        if (p.qtd <= 0) continue;
+        const a = ativoDe(p.ativo_id);
+        const chave = agruparAloc === 'tipo' ? TIPOS_ATIVO[a?.tipo] || 'Outro'
+                    : agruparAloc === 'carteira' ? carteiraDe(p.carteira_id)?.nome : a?.ticker;
+        const sub = agruparAloc === 'ativo' ? (a?.nome || '') : '';
+        const g = grupos.get(chave) || { nome: chave, sub, valor: 0 };
+        g.valor += valorDe(p).valor;
+        grupos.set(chave, g);
+    }
+    const aloc = [...grupos.values()].sort((x, y) => y.valor - x.valor);
+    const totAloc = aloc.reduce((s, g) => s + g.valor, 0) || 1;
+    $('aloc-barra').innerHTML = aloc.map((g, i) =>
+        `<div style="width:${(g.valor / totAloc * 100).toFixed(2)}%;background:${CORES[i % CORES.length]}" title="${esc(g.nome)}"></div>`).join('');
+    $('aloc-barra').setAttribute('aria-label', aloc.map(g => `${g.nome} ${num(g.valor / totAloc * 100, 1)}%`).join(', ') || 'Sem posições');
+    $('aloc-lista').innerHTML = aloc.map((g, i) => `
+        <div class="aloc-item">
+            <i style="background:${CORES[i % CORES.length]}"></i>
+            <span class="nome"><strong>${esc(g.nome)}</strong>${g.sub ? ` <small>${esc(g.sub)}</small>` : ''}</span>
+            <span class="mono">${brlCurto(g.valor)}</span>
+            <span class="mono pct">${num(g.valor / totAloc * 100, 1)}%</span>
+        </div>`).join('') || '<p class="sutil">Sem posições abertas.</p>';
+
+    // ---------- tabela de posições agrupada por carteira ----------
+    const zeradas = $('mostrar-zeradas').checked;
+    const termo = $('busca-posicao').value.trim().toUpperCase();
+    const cores = new Map(aloc.map((g, i) => [g.nome, CORES[i % CORES.length]]));
+    let html = '';
+    for (const c of DB.carteiras.filter(c => cids.has(c.id))) {
+        const daCarteira = posicoes.filter(p => p.carteira_id === c.id);
+        const totCart = daCarteira.filter(p => p.qtd > 0).reduce((s, p) => s + valorDe(p).valor, 0);
+        const linhas = daCarteira
+            .filter(p => zeradas || p.qtd > 0)
+            .filter(p => { const a = ativoDe(p.ativo_id); return !termo || a?.ticker.includes(termo) || (a?.nome || '').toUpperCase().includes(termo); })
+            .sort((x, y) => valorDe(y).valor - valorDe(x).valor);
+        if (!linhas.length) continue;
+
+        let cVal = 0, cCusto = 0, cProv = 0, cReal = 0;
+        const corpo = linhas.map(p => {
+            const a = ativoDe(p.ativo_id);
+            const { cot, valor: v } = valorDe(p);
+            const r = p.qtd > 0 ? v - p.custo : null;
+            const rp = r != null && p.custo > 0 ? r / p.custo * 100 : null;
+            const part = p.qtd > 0 && totCart ? v / totCart * 100 : 0;
+            if (p.qtd > 0) { cVal += v; cCusto += p.custo; }
+            cProv += p.proventos; cReal += p.realizado;
+            const cor = agruparAloc === 'ativo' ? (cores.get(a?.ticker) || '#5B9DFF') : '#5B9DFF';
+            const alerta = p.alerta ? ' <span class="prejuizo" title="Existe venda maior que a posição — confira as ordens">(!)</span>' : '';
+            return `<tr class="${p.qtd === 0 ? 'zerada' : ''}">
+                <td><strong>${esc(a?.ticker)}</strong><span class="ativo-nome">${esc(a?.nome || '')}</span>${alerta}</td>
+                <td class="num">${qtdFmt(p.qtd)}</td>
+                <td class="num">${p.qtd ? num(p.pm) : '—'}</td>
+                <td class="num">${cot ? num(cot.preco) : '—'}</td>
+                <td class="num ${cot ? classe(cot.variacao) : ''}">${cot ? pct(cot.variacao) : '—'}</td>
+                <td class="num">${p.qtd ? num(v) : '—'}</td>
+                <td class="num ${classe(r)}">${r != null ? (r > 0 ? '+' : r < 0 ? '−' : '') + num(Math.abs(r)) : '—'}</td>
+                <td class="num ${classe(rp)}">${rp != null ? pct(rp) : '—'}</td>
+                <td class="num">${p.qtd ? num(part, 1) + '%' : '—'}${p.qtd ? `<div class="barra-pct"><div style="width:${part.toFixed(1)}%;background:${cor}"></div></div>` : ''}</td>
+                <td class="num">${p.proventos ? num(p.proventos) : '—'}</td>
+                <td class="num ${classe(p.realizado)}">${p.realizado ? (p.realizado > 0 ? '+' : '−') + num(Math.abs(p.realizado)) : '—'}</td>
+            </tr>`;
+        }).join('');
+        const cRes = cVal - cCusto, cRp = cCusto > 0 ? cRes / cCusto * 100 : 0;
+        html += `<tr class="grupo">
+                <td colspan="5">${esc(c.nome)}</td>
+                <td class="num">${num(cVal)}</td>
+                <td class="num ${classe(cRes)}">${(cRes > 0 ? '+' : cRes < 0 ? '−' : '') + num(Math.abs(cRes))}</td>
+                <td class="num ${classe(cRp)}">${pct(cRp)}</td>
+                <td></td>
+                <td class="num">${cProv ? num(cProv) : '—'}</td>
+                <td class="num ${classe(cReal)}">${cReal ? (cReal > 0 ? '+' : '−') + num(Math.abs(cReal)) : '—'}</td>
+            </tr>` + corpo;
+    }
+    $('tb-posicao').innerHTML = html ||
+        `<tr><td colspan="11" class="vazio">${termo ? 'Nenhum ativo encontrado.' : 'Nenhuma posição. Cadastre uma carteira, um ativo e lance uma ordem de compra.'}</td></tr>`;
+
+    // ---------- celular: carteiras ----------
+    const cartsCel = DB.carteiras.map(c => {
+        const ps = [...calcularPosicoes().values()].filter(p => p.carteira_id === c.id && p.qtd > 0);
+        const v = ps.reduce((s, p) => s + valorDe(p).valor, 0), k = ps.reduce((s, p) => s + p.custo, 0);
+        return { c, ps, v, rp: k > 0 ? (v / k - 1) * 100 : null };
+    }).filter(x => x.ps.length).sort((a, b) => b.v - a.v);
+    $('m-carteiras').innerHTML = !cartsCel.length ? '' :
+        '<span class="m-titulo">Carteiras · toque para filtrar</span>' + cartsCel.map(x => `
+        <button type="button" class="m-card ${filtroCarteira === x.c.id ? 'ativo' : ''}" data-carteira-filtro="${filtroCarteira === x.c.id ? '' : x.c.id}">
+            <span class="esq"><strong>${esc(x.c.nome)}</strong><small>${x.ps.map(p => esc(ativoDe(p.ativo_id)?.ticker)).join(' · ')}</small></span>
+            <span class="dir"><span>${brl.format(x.v)}</span><small class="${classe(x.rp)}">${x.rp != null ? pct(x.rp) : ''}</small></span>
+        </button>`).join('');
+
+    // ---------- celular: maiores posições (soma o mesmo ativo de várias carteiras) ----------
+    const porAtivo = new Map();
+    for (const p of posicoes) {
+        if (p.qtd <= 0) continue;
+        const g = porAtivo.get(p.ativo_id) || { a: ativoDe(p.ativo_id), qtd: 0, v: 0, k: 0 };
+        g.qtd += p.qtd; g.v += valorDe(p).valor; g.k += p.custo;
+        porAtivo.set(p.ativo_id, g);
+    }
+    const maiores = [...porAtivo.values()].sort((x, y) => y.v - x.v).slice(0, 6);
+    $('m-posicoes').innerHTML = !maiores.length ? '' :
+        '<span class="m-titulo">Maiores posições</span><div class="painel" style="padding:4px 14px">' + maiores.map(g => {
+            const rp = g.k > 0 ? (g.v / g.k - 1) * 100 : null;
+            return `<div class="m-linha">
+                <span><strong>${esc(g.a?.ticker)}</strong><span class="qtd">${qtdFmt(g.qtd)}</span></span>
+                <span class="dir">${brlCurto(g.v)} <span class="${classe(rp)}">${rp != null ? pct(rp) : ''}</span></span>
+            </div>`;
+        }).join('') + '</div>';
+}
+
+// ====================================================================
+// TELA: EVOLUÇÃO
+// ====================================================================
+function renderEvolucao() {
+    if (abaAtual !== 'evolucao') return;
+    if (!window.Chart) { aviso('Biblioteca de gráficos não carregou (verifique a internet).'); return; }
+    const cids = cidsEscopo();
+    const base = montarBase(cids);
+    const R = resumoPeriodo(cids, base);
+    const ult = R.ult;
+
+    $('resumo-evolucao').innerHTML = !ult
+        ? kpi('Sem dados', '—', 'Os fechamentos são gravados automaticamente a cada dia de pregão.')
+        : kpi('Patrimônio', brl.format(ult.V), `investido ${brl.format(ult.I)}`) +
+          kpi('Resultado em aberto', sinalBrl(ult.V - ult.I), ult.I > 0 ? `${seta(ult.V - ult.I)}${pct((ult.V / ult.I - 1) * 100)} sobre o custo` : '', classe(ult.V - ult.I), classe(ult.V - ult.I)) +
+          kpi(ult.data === 'AGORA' ? 'Hoje' : 'Último fechamento', R.varDia != null ? pct(R.varDia) : '—',
+              R.varDiaRs != null ? `${seta(R.varDiaRs)}${sinalBrl(R.varDiaRs)}` : '', classe(R.varDia), classe(R.varDiaRs)) +
+          kpi('Rentabilidade no período', R.rent != null ? pct(R.rent) : '—',
+              R.inicio ? `desde ${dataBR(R.inicio === 'AGORA' ? hojeSP() : R.inicio)}` : '', classe(R.rent)) +
+          kpi('Proventos no período', brl.format(R.provPeriodo), `${R.vis.length} fechamento(s) no período`);
+
+    // ---------- rentabilidade acumulada por carteira ----------
+    const carts = DB.carteiras.filter(c => cids.has(c.id));
+    const datasets = [];
+    const linha = (r, label, cor, tracejado) => datasets.push({
+        label, borderColor: cor, backgroundColor: cor, tension: .25, borderWidth: tracejado ? 2.5 : 2,
+        pointRadius: R.vis.length > 60 ? 0 : 2, borderDash: tracejado ? [6, 4] : [],
+        data: r.vis.map(p => p.ativo ? +((p.cota / r.cotaBase - 1) * 100).toFixed(2) : null)
+    });
+    carts.forEach((c, i) => linha(resumoPeriodo(new Set([c.id]), base), c.nome, CORES[i % CORES.length], false));
+    if (carts.length > 1) linha(R, 'Total', '#E6EAF0', true);
     desenhar('g-rentabilidade', {
         type: 'line',
-        data: { labels: rotulos, datasets: datasetsRent },
-        options: opcoesLinha(v => num(v) + '%', rotulosLongos)
+        data: { labels: R.rotulos, datasets },
+        options: opcoesLinha(v => num(v, 1) + '%', R.rotulosLongos, v => num(v) + '%', true)
     });
 
-    // ---------- gráfico: alocação atual ----------
-    const agrupar = $('agrupar-alocacao').value;
-    const grupos = {};
+    // ---------- resultado em aberto por ativo ----------
+    const porAtivo = new Map();
     for (const p of calcularPosicoes().values()) {
-        if (!cidsEscopo.has(p.carteira_id) || p.qtd <= 0) continue;
-        const a = ativoDe(p.ativo_id);
-        const valor = p.qtd * (COTACOES[normTicker(a?.ticker)]?.preco ?? p.pm);
-        const chave = agrupar === 'tipo' ? TIPOS_ATIVO[a?.tipo] || 'Outro'
-                    : agrupar === 'carteira' ? carteiraDe(p.carteira_id)?.nome : a?.ticker;
-        grupos[chave] = (grupos[chave] || 0) + valor;
+        if (!cids.has(p.carteira_id) || p.qtd <= 0) continue;
+        const t = ativoDe(p.ativo_id)?.ticker;
+        porAtivo.set(t, (porAtivo.get(t) || 0) + valorDe(p).valor - p.custo);
     }
-    const alocacao = Object.entries(grupos).sort((a, b) => b[1] - a[1]);
-    const totalAloc = alocacao.reduce((s, x) => s + x[1], 0);
-    desenhar('g-alocacao', {
-        type: 'doughnut',
+    const resAtivos = [...porAtivo.entries()].sort((a, b) => b[1] - a[1]);
+    desenhar('g-resultado', {
+        type: 'bar',
         data: {
-            labels: alocacao.map(x => x[0]),
-            datasets: [{ data: alocacao.map(x => +x[1].toFixed(2)), backgroundColor: alocacao.map((_, i) => CORES[i % CORES.length]), borderColor: '#1e1e1e', borderWidth: 2 }]
+            labels: resAtivos.map(x => x[0]),
+            datasets: [{ data: resAtivos.map(x => +x[1].toFixed(2)), backgroundColor: resAtivos.map(x => x[1] >= 0 ? '#3FB97A' : '#F2737B'), borderRadius: 4 }]
         },
         options: {
-            responsive: true, maintainAspectRatio: false, cutout: '60%',
-            plugins: {
-                legend: { position: 'right', labels: { color: '#ccc', boxWidth: 12 } },
-                tooltip: { callbacks: { label: (c) => `${c.label}: ${brl.format(c.raw)} (${num(c.raw / totalAloc * 100, 1)}%)` } }
-            }
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => sinalBrl(c.raw) } } },
+            scales: { x: { ticks: { callback: brlCurto } }, y: { grid: { display: false } } }
         }
     });
 
-    // ---------- gráfico: proventos por mês ----------
-    const meses = [];
+    // ---------- proventos por mês ----------
+    const hoje = hojeSP();
     const [ano, mes] = hoje.split('-').map(Number);
-    for (let i = 11; i >= 0; i--) {
-        const d = new Date(Date.UTC(ano, mes - 1 - i, 1));
-        meses.push(d.toISOString().slice(0, 7));
-    }
+    const meses = [];
+    for (let i = 11; i >= 0; i--) meses.push(new Date(Date.UTC(ano, mes - 1 - i, 1)).toISOString().slice(0, 7));
     const porMes = Object.fromEntries(meses.map(m => [m, 0]));
     for (const d of DB.dividendos) {
-        if (!cidsEscopo.has(d.carteira_id)) continue;
+        if (!cids.has(d.carteira_id)) continue;
         const m = d.data_pagamento.slice(0, 7);
         if (m in porMes) porMes[m] += Number(d.valor_total);
     }
@@ -683,33 +830,30 @@ function renderEvolucao() {
         type: 'bar',
         data: {
             labels: meses.map(m => m.slice(5) + '/' + m.slice(2, 4)),
-            datasets: [{ label: 'Proventos', data: meses.map(m => +porMes[m].toFixed(2)), backgroundColor: 'rgba(76,175,80,.7)', borderRadius: 4 }]
+            datasets: [{ data: meses.map(m => +porMes[m].toFixed(2)), backgroundColor: '#3FB97A', borderRadius: 4 }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => brl.format(c.raw) } } },
-            scales: {
-                x: { ticks: { color: '#999' }, grid: { display: false } },
-                y: { ticks: { color: '#999', callback: v => brl.format(v) }, grid: { color: '#2a2a2a' } }
-            }
+            scales: { x: { grid: { display: false } }, y: { ticks: { callback: brlCurto } } }
         }
     });
 }
 
-function opcoesLinha(formato, rotulosLongos) {
+function opcoesLinha(fmtEixo, rotulosLongos, fmtDica = fmtEixo, legenda = true) {
     return {
         responsive: true, maintainAspectRatio: false, spanGaps: true,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-            legend: { labels: { color: '#ccc', boxWidth: 12 } },
-            tooltip: { callbacks: {
+            legend: { display: legenda, labels: { color: '#A9B2BE', boxWidth: 12, boxHeight: 3 } },
+            tooltip: { backgroundColor: '#11151B', borderColor: '#34404D', borderWidth: 1, padding: 10, callbacks: {
                 title: (itens) => rotulosLongos[itens[0].dataIndex],
-                label: (c) => `${c.dataset.label}: ${c.raw == null ? '—' : formato(c.raw)}`
+                label: (c) => ` ${c.dataset.label}: ${c.raw == null ? '—' : fmtDica(c.raw)}`
             } }
         },
         scales: {
-            x: { ticks: { color: '#999', maxRotation: 0, autoSkipPadding: 12 }, grid: { color: '#262626' } },
-            y: { ticks: { color: '#999', callback: formato }, grid: { color: '#2a2a2a' } }
+            x: { ticks: { maxRotation: 0, autoSkipPadding: 16 }, grid: { display: false } },
+            y: { ticks: { callback: fmtEixo } }
         }
     };
 }
@@ -930,6 +1074,7 @@ $('btn-buscar-nome').addEventListener('click', async () => {
 // SELECTS DE CARTEIRA
 // ====================================================================
 function preencherSelects() {
+    desenharFiltroCarteira();
     const op = DB.carteiras.map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
     document.querySelectorAll('.sel-carteira-todas').forEach(s => {
         const v = s.value;
