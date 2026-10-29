@@ -7,11 +7,11 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=10: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
-    <link rel="stylesheet" href="style.css?v=10">
+    <!-- ?v=11: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <link rel="stylesheet" href="style.css?v=11">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=10"></script>
+    <script src="config.js?v=11"></script>
 </head>
 <body>
 
@@ -196,6 +196,18 @@
                         <tfoot id="tf-evol-ativos"></tfoot>
                     </table>
                 </div>
+            </section>
+
+            <section class="painel">
+                <div class="painel-topo">
+                    <h2>Evolução dos ativos</h2>
+                    <div id="seg-modo-ativos" class="segmentado mini" role="group" aria-label="Tipo de gráfico">
+                        <button type="button" data-modo-ativos="pm" class="ativo">Sobre o preço médio</button>
+                        <button type="button" data-modo-ativos="periodo">Variação no período</button>
+                    </div>
+                </div>
+                <div class="canvas-box alto"><canvas id="g-ativos" role="img" aria-label="Gráfico da evolução de cada ativo"></canvas></div>
+                <p id="g-ativos-nota" class="sutil nota-grafico"></p>
             </section>
 
             <div class="graficos">
@@ -412,6 +424,6 @@
     </div>
 </div>
 
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

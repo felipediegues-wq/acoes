@@ -1030,6 +1030,7 @@ function renderEvolucao() {
           kpi('Proventos no período', brl.format(R.provPeriodo), `${R.vis.length} fechamento(s) no período`);
 
     renderTabelaAtivos(cids, R);
+    renderGraficoAtivos(cids, R);
 
     // ---------- rentabilidade acumulada por carteira ----------
     const carts = DB.carteiras.filter(c => cids.has(c.id));
@@ -1109,6 +1110,80 @@ function renderEvolucao() {
 // EVOLUÇÃO: tabela de ativos (soma o mesmo ativo das carteiras filtradas)
 // ====================================================================
 let ordemAtivos = { campo: 'valor', desc: true };
+
+// ====================================================================
+// EVOLUÇÃO: gráfico com uma linha por ativo
+//  "pm"      → rendimento sobre o preço médio em cada dia: preço do dia / PM do dia − 1
+//              (o PM do dia considera só as ordens até aquela data)
+//  "periodo" → variação do preço desde o início do período (com o Ibovespa de referência)
+// ====================================================================
+let modoAtivos = 'pm';
+document.addEventListener('click', (e) => {
+    const b = e.target.closest('#seg-modo-ativos [data-modo-ativos]');
+    if (!b) return;
+    modoAtivos = b.dataset.modoAtivos;
+    document.querySelectorAll('#seg-modo-ativos button').forEach(x => x.classList.toggle('ativo', x === b));
+    renderEvolucao();
+});
+
+function renderGraficoAtivos(cids, R) {
+    const datas = R.base.datas.slice(R.ini);
+    const celular = window.matchMedia('(max-width: 760px)').matches;
+
+    // ativos em posição hoje, do maior para o menor valor (mesmas cores da alocação)
+    const hoje = new Map();
+    for (const p of calcularPosicoes().values()) {
+        if (!cids.has(p.carteira_id) || p.qtd <= 0) continue;
+        hoje.set(p.ativo_id, (hoje.get(p.ativo_id) || 0) + valorDe(p).valor);
+    }
+    const ativos = [...hoje.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => ativoDe(id));
+
+    const datasets = ativos.map((a, i) => {
+        const t = normTicker(a?.ticker);
+        let base = null;
+        const dados = datas.map(d => {
+            const preco = R.base.precosPorData.get(d)?.[t];
+            if (preco == null) return null;
+            if (modoAtivos === 'pm') {
+                let qtd = 0, custo = 0;
+                for (const p of R.base.posPorData.get(d).values()) {
+                    if (p.ativo_id === a.id && cids.has(p.carteira_id) && p.qtd > 0) { qtd += p.qtd; custo += p.custo; }
+                }
+                return qtd > 0 ? +((preco / (custo / qtd) - 1) * 100).toFixed(2) : null;
+            }
+            if (base == null) base = preco;
+            return +((preco / base - 1) * 100).toFixed(2);
+        });
+        return {
+            label: t, data: dados, borderColor: CORES[i % CORES.length], backgroundColor: CORES[i % CORES.length],
+            borderWidth: 2, tension: .25, pointRadius: 0, pointHoverRadius: 4
+        };
+    });
+
+    if (modoAtivos === 'periodo') {
+        let base = null;
+        const ibov = datas.map(d => {
+            const v = R.base.precosPorData.get(d)?.[IBOV];
+            if (v == null) return null;
+            if (base == null) base = v;
+            return +((v / base - 1) * 100).toFixed(2);
+        });
+        if (ibov.filter(v => v != null).length >= 2) {
+            datasets.push({ label: 'Ibovespa', data: ibov, borderColor: '#E6EAF0', backgroundColor: '#E6EAF0', borderDash: [5, 4], borderWidth: 2, tension: .25, pointRadius: 0 });
+        }
+    }
+
+    const opcoes = opcoesLinha(v => num(v, 0) + '%', R.rotulosLongos, v => pct(v), true);
+    opcoes.plugins.legend.position = celular ? 'bottom' : 'top';
+    // linha do zero destacada: acima = ganho, abaixo = perda
+    opcoes.scales.y.grid = { color: (c) => c.tick?.value === 0 ? '#5A6574' : '#1D232B', lineWidth: (c) => c.tick?.value === 0 ? 1.5 : 1 };
+    desenhar('g-ativos', { type: 'line', data: { labels: R.rotulos, datasets }, options: opcoes });
+
+    $('g-ativos-nota').textContent = !ativos.length ? 'Nenhum ativo em posição nas carteiras selecionadas.'
+        : modoAtivos === 'pm'
+            ? 'Quanto cada ativo está acima (positivo) ou abaixo (negativo) do seu preço médio em cada dia. Toque no nome na legenda para esconder ou mostrar um ativo.'
+            : 'Quanto o preço de cada ativo subiu ou caiu desde o primeiro dia do período, comparado ao Ibovespa. Toque no nome na legenda para esconder ou mostrar.';
+}
 
 document.addEventListener('click', (e) => {
     const th = e.target.closest('.tabela-ativos th[data-ordenar]');

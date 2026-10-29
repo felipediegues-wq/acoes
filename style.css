@@ -203,6 +203,7 @@ table.dados tfoot td { font-weight: 600; border-top: 1px solid var(--borda); bor
 .graficos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
 .graficos .largo { grid-column: 1 / -1; }
 .nota { max-width: 900px; }
+.nota-grafico { margin-top: 10px; }
 
 /* ====================================================================
    CELULAR (layout C)
