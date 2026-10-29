@@ -231,6 +231,27 @@ table.dados tfoot td { font-weight: 600; border-top: 1px solid var(--borda); bor
     .tabela-ativos th:first-child, .tabela-ativos td:first-child { position: sticky; left: 0; z-index: 1; background: var(--painel); box-shadow: 1px 0 0 var(--borda); }
     .tabela-ativos tfoot td:first-child { background: var(--topo); }
     .tabela-ativos .ativo-nome, .dica-ordenar { display: none; }
+
+    /* Evolução no celular: cartões de ativos */
+    .m-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .m-cab .m-titulo { margin: 0; }
+    .m-ordem select { min-height: 38px; font-size: 14px; padding: 0 8px; }
+    .ativo-card { background: var(--painel); border: 1px solid var(--borda); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+    .ativo-card.total { background: var(--topo); }
+    .ac-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+    .ac-nome { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .ac-nome strong { font-size: 17px; }
+    .ac-nome small { color: var(--sutil); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ac-rend { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-family: var(--mono); white-space: nowrap; }
+    .ac-rend strong { font-size: 18px; font-weight: 500; }
+    .ac-rend small { font-size: 13px; }
+    .ac-spark { margin: 10px 0 8px; }
+    .ac-spark .spark { width: 100%; height: 44px; }
+    .ac-grade { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 12px; padding-top: 10px; border-top: 1px solid var(--linha); }
+    .ac-grade.dois { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; }
+    .ac-grade div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .ac-grade span { color: var(--sutil); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+    .ac-grade strong { font-family: var(--mono); font-weight: 500; font-size: 14px; white-space: nowrap; }
     .kpis .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
     .form-grid > label:first-of-type { grid-column: 1 / -1; }
 

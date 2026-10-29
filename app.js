@@ -1119,9 +1119,9 @@ document.addEventListener('click', (e) => {
 });
 
 // Minigráfico: preço de fechamento de cada dia salvo no período (+ cotação atual) contra a linha do preço médio
-function sparkline(precos, pm) {
+function sparkline(precos, pm, W = 150, H = 34) {
     if (precos.length < 2) return '<span class="sutil">—</span>';
-    const W = 150, H = 34, P = 3;
+    const P = 3;
     const min = Math.min(pm, ...precos), max = Math.max(pm, ...precos);
     const amp = max - min || 1;
     const x = (i) => P + i * (W - 2 * P) / (precos.length - 1);
@@ -1197,7 +1197,46 @@ function renderTabelaAtivos(cids, R) {
         <td class="num ${classe(tRend)}">${sinal(tRend)}</td>
         <td class="num ${classe(tPct)}">${pct(tPct)}</td><td></td>
     </tr>`;
+
+    // ---------- celular: cartões ----------
+    $('ordem-ativos-cel').value = `${campo}|${desc ? 'desc' : 'asc'}`;
+    const cel = (rot, val, cls = '') => `<div><span>${rot}</span><strong class="${cls}">${val}</strong></div>`;
+    $('m-evol-ativos').innerHTML = linhas.map(l => `
+        <article class="ativo-card">
+            <div class="ac-topo">
+                <div class="ac-nome"><strong>${esc(l.ticker)}</strong><small>${esc(l.a?.nome || '')}</small></div>
+                <div class="ac-rend ${classe(l.rendPct)}">
+                    <strong>${seta(l.rendPct)}${pct(l.rendPct)}</strong>
+                    <small>${sinal(l.rend)}</small>
+                </div>
+            </div>
+            <div class="ac-spark">${sparkline(l.precos, l.pm, 320, 44)}</div>
+            <div class="ac-grade">
+                ${cel('Quant.', qtdFmt(l.qtd))}
+                ${cel('Preço médio', num(l.pm))}
+                ${cel('Cotação', l.cotacao != null ? num(l.cotacao) : '—')}
+                ${cel('Investido', num(l.custo))}
+                ${cel('Valor atual', num(l.valor) + (l.cotacao == null ? '*' : ''))}
+                ${cel('Dia', l.dia != null ? seta(l.dia) + pct(l.dia) : '—', classe(l.dia))}
+            </div>
+        </article>`).join('') || '<p class="sutil">Nenhum ativo em posição nas carteiras selecionadas.</p>';
+    if (linhas.length) {
+        $('m-evol-ativos').innerHTML += `
+        <div class="ativo-card total">
+            <div class="ac-topo">
+                <div class="ac-nome"><strong>Total</strong><small>${linhas.length} ativo${linhas.length > 1 ? 's' : ''} · investido ${brl.format(tCusto)}</small></div>
+                <div class="ac-rend ${classe(tPct)}"><strong>${seta(tPct)}${pct(tPct)}</strong><small>${sinal(tRend)}</small></div>
+            </div>
+            <div class="ac-grade dois">${cel('Valor atual', brl.format(tValor))}${cel('Rendimento', sinal(tRend), classe(tRend))}</div>
+        </div>`;
+    }
 }
+
+$('ordem-ativos-cel').addEventListener('change', (e) => {
+    const [campo, sentido] = e.target.value.split('|');
+    ordemAtivos = { campo, desc: sentido === 'desc' };
+    renderEvolucao();
+});
 
 function opcoesLinha(fmtEixo, rotulosLongos, fmtDica = fmtEixo, legenda = true) {
     return {

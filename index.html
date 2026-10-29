@@ -7,11 +7,11 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=9: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
-    <link rel="stylesheet" href="style.css?v=9">
+    <!-- ?v=10: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <link rel="stylesheet" href="style.css?v=10">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=9"></script>
+    <script src="config.js?v=10"></script>
 </head>
 <body>
 
@@ -155,7 +155,25 @@
         <section id="aba-evolucao" class="aba-conteudo">
             <section id="resumo-evolucao" class="kpis" aria-label="Resumo do período"></section>
 
-            <section class="painel sem-padding">
+            <!-- celular: um cartão por ativo (sem rolar para o lado) -->
+            <section class="m-bloco so-celular">
+                <div class="m-cab">
+                    <span class="m-titulo">Ativos</span>
+                    <label class="inline m-ordem">Ordenar
+                        <select id="ordem-ativos-cel">
+                            <option value="valor|desc">Maior valor</option>
+                            <option value="rendPct|desc">Maior rendimento</option>
+                            <option value="rendPct|asc">Menor rendimento</option>
+                            <option value="dia|desc">Maior alta no dia</option>
+                            <option value="dia|asc">Maior baixa no dia</option>
+                            <option value="ticker|asc">Ticker (A–Z)</option>
+                        </select>
+                    </label>
+                </div>
+                <div id="m-evol-ativos"></div>
+            </section>
+
+            <section class="painel sem-padding so-desktop">
                 <div class="painel-topo com-padding">
                     <h2>Ativos</h2>
                     <span class="sutil dica-ordenar">Clique no título da coluna para ordenar · rendimento calculado sobre o preço médio das ordens</span>
@@ -394,6 +412,6 @@
     </div>
 </div>
 
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
