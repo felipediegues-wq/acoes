@@ -234,6 +234,15 @@ table.dados tfoot td { font-weight: 600; border-top: 1px solid var(--borda); bor
     .kpis .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; }
     .form-grid > label:first-of-type { grid-column: 1 / -1; }
 
+    /* ---- "casca" de app: a página não rola; só o meio (.conteudo) rola.
+           Topo e barra de baixo ficam parados, mesmo quando a barra do navegador aparece/some
+           ou quando a tela "estica" no fim da rolagem (efeito elástico do iPhone). ---- */
+    html.modo-app, html.modo-app body { height: 100%; overflow: hidden; overscroll-behavior: none; }
+    html.modo-app #tela-app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+    html.modo-app .topo { position: relative; flex: none; }
+    html.modo-app .conteudo { flex: 1 1 auto; min-height: 0; width: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; padding-bottom: 28px; }
+    html.modo-app .nav-celular { position: relative !important; flex: none; }
+
     .conteudo { padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); }
     .titulo-linha { margin-bottom: 14px; }
     .titulo-linha h1 { font-size: 20px; }

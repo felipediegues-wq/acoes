@@ -107,10 +107,12 @@ sb.auth.onAuthStateChange((_evento, sessao) => {
     if (sessao) {
         $('tela-login').classList.add('oculto');
         $('tela-app').classList.remove('oculto');
+        document.documentElement.classList.add('modo-app');   // no celular: só o meio da tela rola
         $('usuario-email').textContent = sessao.user.email;
         setTimeout(() => recarregarTudo(false), 0);
     } else {
         $('tela-app').classList.add('oculto');
+        document.documentElement.classList.remove('modo-app');
         $('tela-login').classList.remove('oculto');
     }
 });
@@ -128,6 +130,7 @@ function mostrarAba(aba) {
     $('barra-filtros').classList.toggle('oculto', aba !== 'visao' && aba !== 'evolucao');
     fecharMais();
     window.scrollTo(0, 0);
+    document.querySelector('.conteudo').scrollTop = 0;   // no celular quem rola é o .conteudo
     renderGraficosVisiveis();   // gráfico precisa estar visível para medir o tamanho
 }
 
