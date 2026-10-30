@@ -205,6 +205,18 @@ table.dados tfoot td { font-weight: 600; border-top: 1px solid var(--borda); bor
 .nota { max-width: 900px; }
 .nota-grafico { margin-top: 10px; }
 
+/* ---------------- Gráficos: evolução dos ativos ---------------- */
+.subtitulo-aba { margin-top: -14px; }
+.chips-ativos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.chip-ativo { min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 10px; background: transparent; border: 1px dashed #2E3742; border-radius: 8px; color: var(--sutil); font: inherit; cursor: pointer; }
+.chip-ativo i { display: inline-block; width: 16px; height: 3px; border-radius: 2px; opacity: .35; }
+.chip-ativo i.tracejado { height: 0; border-top: 2px dashed var(--sutil2); background: none; }
+.chip-ativo .mono { opacity: .6; }
+.chip-ativo.on { background: #1A2029; border: 1px solid #2E3742; color: var(--texto); }
+.chip-ativo.on i, .chip-ativo.on .mono { opacity: 1; }
+.chip-ativo:hover { border-color: #4A5462; }
+.cor-ativo { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 10px; vertical-align: 0; }
+
 /* ====================================================================
    CELULAR (layout C)
    ==================================================================== */
@@ -232,6 +244,10 @@ table.dados tfoot td { font-weight: 600; border-top: 1px solid var(--borda); bor
     .tabela-ativos th:first-child, .tabela-ativos td:first-child { position: sticky; left: 0; z-index: 1; background: var(--painel); box-shadow: 1px 0 0 var(--borda); }
     .tabela-ativos tfoot td:first-child { background: var(--topo); }
     .tabela-ativos .ativo-nome, .dica-ordenar { display: none; }
+
+    .subtitulo-aba { display: none; }
+    .chips-ativos { gap: 6px; }
+    .chip-ativo { min-height: 40px; padding: 0 10px; gap: 8px; font-size: 13px; }
 
     /* Evolução no celular: cartões de ativos */
     .m-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 8px; }

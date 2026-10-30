@@ -7,11 +7,11 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=11: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
-    <link rel="stylesheet" href="style.css?v=11">
+    <!-- ?v=12: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <link rel="stylesheet" href="style.css?v=12">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=11"></script>
+    <script src="config.js?v=12"></script>
 </head>
 <body>
 
@@ -41,6 +41,7 @@
             <nav class="nav-principal" aria-label="Principal">
                 <a href="#" data-aba="visao" class="ativo">Visão geral</a>
                 <a href="#" data-aba="evolucao">Evolução</a>
+                <a href="#" data-aba="graficos">Gráficos</a>
                 <a href="#" data-aba="ordens">Ordens</a>
                 <a href="#" data-aba="proventos">Proventos</a>
                 <a href="#" data-aba="ativos">Ativos</a>
@@ -198,17 +199,6 @@
                 </div>
             </section>
 
-            <section class="painel">
-                <div class="painel-topo">
-                    <h2>Evolução dos ativos</h2>
-                    <div id="seg-modo-ativos" class="segmentado mini" role="group" aria-label="Tipo de gráfico">
-                        <button type="button" data-modo-ativos="pm" class="ativo">Sobre o preço médio</button>
-                        <button type="button" data-modo-ativos="periodo">Variação no período</button>
-                    </div>
-                </div>
-                <div class="canvas-box alto"><canvas id="g-ativos" role="img" aria-label="Gráfico da evolução de cada ativo"></canvas></div>
-                <p id="g-ativos-nota" class="sutil nota-grafico"></p>
-            </section>
 
             <div class="graficos">
                 <section class="painel largo">
@@ -229,6 +219,43 @@
                 (ou na próxima vez que você abrir). O último ponto, "Agora", usa a cotação atual.
                 A rentabilidade usa o método de cotas: aportes e vendas não distorcem o percentual.
             </p>
+        </section>
+
+        <!-- ================= GRÁFICOS: EVOLUÇÃO DOS ATIVOS ================= -->
+        <section id="aba-graficos" class="aba-conteudo">
+            <p class="sutil subtitulo-aba">Rentabilidade de cada ativo sobre o preço médio, dia a dia</p>
+            <section class="painel">
+                <div class="painel-topo">
+                    <h2>Rentabilidade por ativo</h2>
+                    <div id="seg-medida" class="segmentado mini" role="group" aria-label="Medida">
+                        <button type="button" data-medida="rent" class="ativo">Rentabilidade %</button>
+                        <button type="button" data-medida="valor">Valor R$</button>
+                        <button type="button" data-medida="cotacao">Cotação</button>
+                    </div>
+                </div>
+                <div id="chips-ativos" class="chips-ativos" role="group" aria-label="Ativos no gráfico"></div>
+                <div class="canvas-box alto"><canvas id="g-ativos" role="img" aria-label="Gráfico da evolução de cada ativo"></canvas></div>
+                <p id="g-ativos-nota" class="sutil nota-grafico"></p>
+            </section>
+
+            <section class="painel sem-padding so-desktop">
+                <div class="painel-topo com-padding"><h2>Evolução de cada ativo</h2></div>
+                <div class="tabela-wrap">
+                    <table class="dados">
+                        <thead><tr>
+                            <th>Ativo</th><th class="num">1ª compra</th><th class="num">Preço médio</th><th class="num">Cotação</th>
+                            <th class="num" title="Maior rentabilidade no período">Máxima</th>
+                            <th class="num" title="Menor rentabilidade no período">Mínima</th>
+                            <th class="num">Variação</th><th class="col-evol">Tendência</th>
+                        </tr></thead>
+                        <tbody id="tb-graficos"></tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="m-bloco so-celular">
+                <span class="m-titulo">Evolução de cada ativo</span>
+                <div id="m-graficos"></div>
+            </section>
         </section>
 
         <!-- ================= ORDENS ================= -->
@@ -415,6 +442,7 @@
     <div id="menu-mais" class="folha oculto">
         <div class="folha-fundo" data-fechar-mais></div>
         <div class="folha-conteudo" role="dialog" aria-label="Mais opções">
+            <a href="#" data-aba="graficos">Gráficos dos ativos</a>
             <a href="#" data-aba="proventos">Proventos</a>
             <a href="#" data-aba="ativos">Ativos</a>
             <a href="#" data-aba="carteiras">Carteiras</a>
@@ -424,6 +452,6 @@
     </div>
 </div>
 
-<script src="app.js?v=11"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>

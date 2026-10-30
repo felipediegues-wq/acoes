@@ -77,7 +77,7 @@ const ativoDe = (id) => DB.ativos.find(a => a.id === id);
 const carteiraDe = (id) => DB.carteiras.find(c => c.id === id);
 
 const TITULOS = {
-    visao: 'Visão geral', evolucao: 'Evolução', ordens: 'Ordens', proventos: 'Proventos',
+    visao: 'Visão geral', evolucao: 'Evolução', graficos: 'Evolução dos ativos', ordens: 'Ordens', proventos: 'Proventos',
     ativos: 'Ativos', carteiras: 'Carteiras', config: 'Configurações'
 };
 let abaAtual = 'visao';
@@ -127,7 +127,7 @@ function mostrarAba(aba) {
         .forEach(el => el.classList.toggle('ativo', el.dataset.aba === aba));
     $('aba-' + aba).classList.add('ativa');
     $('titulo-pagina').textContent = TITULOS[aba];
-    $('barra-filtros').classList.toggle('oculto', aba !== 'visao' && aba !== 'evolucao');
+    $('barra-filtros').classList.toggle('oculto', !['visao', 'evolucao', 'graficos'].includes(aba));
     fecharMais();
     window.scrollTo(0, 0);
     document.querySelector('.conteudo').scrollTop = 0;   // no celular quem rola é o .conteudo
@@ -137,6 +137,7 @@ function mostrarAba(aba) {
 function renderGraficosVisiveis() {
     if (abaAtual === 'visao') renderVisao();
     if (abaAtual === 'evolucao') renderEvolucao();
+    if (abaAtual === 'graficos') renderGraficos();
 }
 
 function abrirMais() { $('menu-mais').classList.remove('oculto'); $('btn-mais').setAttribute('aria-expanded', 'true'); }
@@ -1030,7 +1031,6 @@ function renderEvolucao() {
           kpi('Proventos no período', brl.format(R.provPeriodo), `${R.vis.length} fechamento(s) no período`);
 
     renderTabelaAtivos(cids, R);
-    renderGraficoAtivos(cids, R);
 
     // ---------- rentabilidade acumulada por carteira ----------
     const carts = DB.carteiras.filter(c => cids.has(c.id));
@@ -1110,88 +1110,6 @@ function renderEvolucao() {
 // EVOLUÇÃO: tabela de ativos (soma o mesmo ativo das carteiras filtradas)
 // ====================================================================
 let ordemAtivos = { campo: 'valor', desc: true };
-
-// ====================================================================
-// EVOLUÇÃO: gráfico com uma linha por ativo
-//  "pm"      → rendimento sobre o preço médio em cada dia: preço do dia / PM do dia − 1
-//              (o PM do dia considera só as ordens até aquela data)
-//  "periodo" → variação do preço desde o início do período (com o Ibovespa de referência)
-// ====================================================================
-let modoAtivos = 'pm';
-document.addEventListener('click', (e) => {
-    const b = e.target.closest('#seg-modo-ativos [data-modo-ativos]');
-    if (!b) return;
-    modoAtivos = b.dataset.modoAtivos;
-    document.querySelectorAll('#seg-modo-ativos button').forEach(x => x.classList.toggle('ativo', x === b));
-    renderEvolucao();
-});
-
-function renderGraficoAtivos(cids, R) {
-    const datas = R.base.datas.slice(R.ini);
-    const celular = window.matchMedia('(max-width: 760px)').matches;
-
-    // ativos em posição hoje, do maior para o menor valor (mesmas cores da alocação)
-    const hoje = new Map();
-    for (const p of calcularPosicoes().values()) {
-        if (!cids.has(p.carteira_id) || p.qtd <= 0) continue;
-        hoje.set(p.ativo_id, (hoje.get(p.ativo_id) || 0) + valorDe(p).valor);
-    }
-    const ativos = [...hoje.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => ativoDe(id));
-
-    const datasets = ativos.map((a, i) => {
-        const t = normTicker(a?.ticker);
-        let base = null;
-        const dados = datas.map(d => {
-            const preco = R.base.precosPorData.get(d)?.[t];
-            if (preco == null) return null;
-            if (modoAtivos === 'pm') {
-                let qtd = 0, custo = 0;
-                for (const p of R.base.posPorData.get(d).values()) {
-                    if (p.ativo_id === a.id && cids.has(p.carteira_id) && p.qtd > 0) { qtd += p.qtd; custo += p.custo; }
-                }
-                return qtd > 0 ? +((preco / (custo / qtd) - 1) * 100).toFixed(2) : null;
-            }
-            if (base == null) base = preco;
-            return +((preco / base - 1) * 100).toFixed(2);
-        });
-        return {
-            label: t, data: dados, borderColor: CORES[i % CORES.length], backgroundColor: CORES[i % CORES.length],
-            borderWidth: 2, tension: .25, pointRadius: 0, pointHoverRadius: 4
-        };
-    });
-
-    if (modoAtivos === 'periodo') {
-        let base = null;
-        const ibov = datas.map(d => {
-            const v = R.base.precosPorData.get(d)?.[IBOV];
-            if (v == null) return null;
-            if (base == null) base = v;
-            return +((v / base - 1) * 100).toFixed(2);
-        });
-        if (ibov.filter(v => v != null).length >= 2) {
-            datasets.push({ label: 'Ibovespa', data: ibov, borderColor: '#E6EAF0', backgroundColor: '#E6EAF0', borderDash: [5, 4], borderWidth: 2, tension: .25, pointRadius: 0 });
-        }
-    }
-
-    const opcoes = opcoesLinha(v => num(v, 0) + '%', R.rotulosLongos, v => pct(v), true);
-    opcoes.plugins.legend.position = celular ? 'bottom' : 'top';
-    // linha do zero destacada: acima = ganho, abaixo = perda
-    opcoes.scales.y.grid = { color: (c) => c.tick?.value === 0 ? '#5A6574' : '#1D232B', lineWidth: (c) => c.tick?.value === 0 ? 1.5 : 1 };
-    desenhar('g-ativos', { type: 'line', data: { labels: R.rotulos, datasets }, options: opcoes });
-
-    $('g-ativos-nota').textContent = !ativos.length ? 'Nenhum ativo em posição nas carteiras selecionadas.'
-        : modoAtivos === 'pm'
-            ? 'Quanto cada ativo está acima (positivo) ou abaixo (negativo) do seu preço médio em cada dia. Toque no nome na legenda para esconder ou mostrar um ativo.'
-            : 'Quanto o preço de cada ativo subiu ou caiu desde o primeiro dia do período, comparado ao Ibovespa. Toque no nome na legenda para esconder ou mostrar.';
-}
-
-document.addEventListener('click', (e) => {
-    const th = e.target.closest('.tabela-ativos th[data-ordenar]');
-    if (!th) return;
-    const campo = th.dataset.ordenar;
-    ordemAtivos = ordemAtivos.campo === campo ? { campo, desc: !ordemAtivos.desc } : { campo, desc: campo !== 'ticker' };
-    renderEvolucao();
-});
 
 // Minigráfico: preço de fechamento de cada dia salvo no período (+ cotação atual) contra a linha do preço médio
 function sparkline(precos, pm, W = 150, H = 34) {
@@ -1312,6 +1230,159 @@ $('ordem-ativos-cel').addEventListener('change', (e) => {
     ordemAtivos = { campo, desc: sentido === 'desc' };
     renderEvolucao();
 });
+
+// ====================================================================
+// GRÁFICOS: evolução dos ativos (página própria)
+//  Medidas por dia (fechamentos gravados + "Agora"):
+//   rent    → preço do dia / preço médio do dia − 1 (PM só com as ordens até aquela data)
+//   valor   → quantidade do dia × preço do dia
+//   cotacao → preço do dia
+//  Botões (chips) ligam/desligam cada ativo; "Carteira (total)" soma os selecionados.
+// ====================================================================
+let medidaAtivos = 'rent';
+const ativosOcultos = new Set();
+let mostrarTotalAtivos = false;
+
+document.addEventListener('click', (e) => {
+    const bm = e.target.closest('#seg-medida [data-medida]');
+    if (bm) {
+        medidaAtivos = bm.dataset.medida;
+        document.querySelectorAll('#seg-medida button').forEach(x => x.classList.toggle('ativo', x === bm));
+        renderGraficos();
+        return;
+    }
+    const chip = e.target.closest('[data-chip-ativo]');
+    if (chip) {
+        const t = chip.dataset.chipAtivo;
+        if (t === '__total') mostrarTotalAtivos = !mostrarTotalAtivos;
+        else if (ativosOcultos.has(t)) ativosOcultos.delete(t); else ativosOcultos.add(t);
+        renderGraficos();
+    }
+});
+
+function renderGraficos() {
+    if (abaAtual !== 'graficos') return;
+    if (!window.Chart) { aviso('Biblioteca de gráficos não carregou (verifique a internet).'); return; }
+    const cids = cidsEscopo();
+    const R = resumoPeriodo(cids);
+    const base = R.base, datas = base.datas.slice(R.ini);
+    const celular = window.matchMedia('(max-width: 760px)').matches;
+
+    // ativos em posição hoje (maior valor primeiro — mesmas cores da alocação)
+    const agora = new Map();
+    for (const p of calcularPosicoes().values()) {
+        if (!cids.has(p.carteira_id) || p.qtd <= 0) continue;
+        const g = agora.get(p.ativo_id) || { a: ativoDe(p.ativo_id), qtd: 0, custo: 0, valor: 0, cot: null };
+        const v = valorDe(p);
+        g.qtd += p.qtd; g.custo += p.custo; g.valor += v.valor; g.cot = v.cot;
+        agora.set(p.ativo_id, g);
+    }
+    const lista = [...agora.values()].sort((x, y) => y.valor - x.valor).map((g, i) => {
+        const t = normTicker(g.a?.ticker);
+        // série diária do ativo
+        const serie = datas.map(d => {
+            const preco = base.precosPorData.get(d)?.[t];
+            if (preco == null) return null;
+            let qtd = 0, custo = 0;
+            for (const p of base.posPorData.get(d).values()) {
+                if (p.ativo_id === g.a.id && cids.has(p.carteira_id) && p.qtd > 0) { qtd += p.qtd; custo += p.custo; }
+            }
+            if (qtd <= 0) return null;
+            return { preco, qtd, custo, valor: qtd * preco, rent: (preco / (custo / qtd) - 1) * 100 };
+        });
+        const rentAtual = g.custo > 0 ? (g.valor / g.custo - 1) * 100 : 0;
+        return { ...g, t, cor: CORES[i % CORES.length], serie, rentAtual, pm: g.custo / g.qtd };
+    });
+
+    // ---------- chips ----------
+    $('chips-ativos').innerHTML = lista.map(l => {
+        const on = !ativosOcultos.has(l.t);
+        return `<button type="button" class="chip-ativo ${on ? 'on' : ''}" data-chip-ativo="${esc(l.t)}" aria-pressed="${on}">
+            <i style="background:${l.cor}"></i><strong>${esc(l.t)}</strong>
+            <span class="mono ${classe(l.rentAtual)}">${pct(l.rentAtual)}</span></button>`;
+    }).join('') + (lista.length && medidaAtivos !== 'cotacao' ? `
+        <button type="button" class="chip-ativo total ${mostrarTotalAtivos ? 'on' : ''}" data-chip-ativo="__total" aria-pressed="${mostrarTotalAtivos}">
+            <i class="tracejado"></i>Carteira (total)</button>` : '');
+
+    // ---------- gráfico ----------
+    const pega = (s) => s == null ? null : +(medidaAtivos === 'rent' ? s.rent : medidaAtivos === 'valor' ? s.valor : s.preco).toFixed(2);
+    const datasets = lista.map(l => ({
+        label: l.t, data: l.serie.map(pega), hidden: ativosOcultos.has(l.t),
+        borderColor: l.cor, backgroundColor: l.cor, borderWidth: 2, tension: .25,
+        pointRadius: datas.length > 40 ? 0 : 2, pointHoverRadius: 4
+    }));
+    if (mostrarTotalAtivos && medidaAtivos !== 'cotacao') {
+        const visiveis = lista.filter(l => !ativosOcultos.has(l.t));
+        datasets.push({
+            label: 'Carteira (total)', borderColor: '#E6EAF0', backgroundColor: '#E6EAF0', borderDash: [6, 4], borderWidth: 2.5, tension: .25, pointRadius: 0,
+            data: datas.map((_, k) => {
+                let v = 0, c = 0, tem = false;
+                for (const l of visiveis) { const s = l.serie[k]; if (s) { v += s.valor; c += s.custo; tem = true; } }
+                if (!tem) return null;
+                return +(medidaAtivos === 'rent' ? (v / c - 1) * 100 : v).toFixed(2);
+            })
+        });
+    }
+    const fmt = {
+        rent: [v => num(v, 0) + '%', v => pct(v)],
+        valor: [brlCurto, v => brl.format(v)],
+        cotacao: [v => num(v), v => brl.format(v)]
+    }[medidaAtivos];
+    const opcoes = opcoesLinha(fmt[0], R.rotulosLongos, fmt[1], false);
+    opcoes.plugins.tooltip.itemSort = (a, b) => (b.raw ?? -Infinity) - (a.raw ?? -Infinity);
+    if (medidaAtivos === 'rent') {
+        opcoes.scales.y.grid = { color: (c) => c.tick?.value === 0 ? '#5A6574' : '#1D232B', lineWidth: (c) => c.tick?.value === 0 ? 1.5 : 1 };
+    }
+    desenhar('g-ativos', { type: 'line', data: { labels: R.rotulos, datasets }, options: opcoes });
+
+    $('g-ativos-nota').textContent = !lista.length ? 'Nenhum ativo em posição nas carteiras selecionadas.'
+        : ({
+            rent: 'Quanto cada ativo está acima (positivo) ou abaixo (negativo) do seu preço médio em cada dia. ',
+            valor: 'Quanto valia a sua posição em cada ativo em cada dia (quantidade × preço de fechamento). ',
+            cotacao: 'Preço de fechamento de cada ativo em cada dia. '
+          })[medidaAtivos] + (celular ? 'Toque' : 'Clique') + ' nos botões acima para esconder ou mostrar um ativo.';
+
+    // ---------- tabela / cartões ----------
+    const linhas = lista.map(l => {
+        const rents = l.serie.filter(Boolean).map(s => s.rent);
+        const primeira = DB.ordens.filter(o => o.ativo_id === l.a.id && o.tipo === 'C' && cids.has(o.carteira_id))
+            .map(o => o.data_ordem).sort()[0];
+        return {
+            ...l, primeira,
+            max: rents.length ? Math.max(...rents, l.rentAtual) : null,
+            min: rents.length ? Math.min(...rents, l.rentAtual) : null,
+            precos: l.serie.filter(Boolean).map(s => s.preco)
+        };
+    });
+    const pc = (v) => v == null ? '—' : pct(v);
+    $('tb-graficos').innerHTML = linhas.map(l => `<tr>
+        <td><i class="cor-ativo" style="background:${l.cor}"></i><strong>${esc(l.t)}</strong><span class="ativo-nome">${esc(l.a?.nome || '')}</span></td>
+        <td class="num">${l.primeira ? dataBR(l.primeira).slice(0, 5) + '/' + l.primeira.slice(2, 4) : '—'}</td>
+        <td class="num">${num(l.pm)}</td>
+        <td class="num">${l.cot ? num(l.cot.preco) : '—'}</td>
+        <td class="num ${classe(l.max)}">${pc(l.max)}</td>
+        <td class="num ${classe(l.min)}">${pc(l.min)}</td>
+        <td class="num ${classe(l.rentAtual)}">${seta(l.rentAtual)}${pct(l.rentAtual)}</td>
+        <td>${sparkline(l.precos, l.pm)}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="vazio">Nenhum ativo em posição nas carteiras selecionadas.</td></tr>';
+
+    const cel = (rot, val, cls = '') => `<div><span>${rot}</span><strong class="${cls}">${val}</strong></div>`;
+    $('m-graficos').innerHTML = linhas.map(l => `
+        <article class="ativo-card">
+            <div class="ac-topo">
+                <div class="ac-nome"><strong><i class="cor-ativo" style="background:${l.cor}"></i>${esc(l.t)}</strong><small>${esc(l.a?.nome || '')}</small></div>
+                <div class="ac-rend ${classe(l.rentAtual)}"><strong>${seta(l.rentAtual)}${pct(l.rentAtual)}</strong><small>sobre o PM</small></div>
+            </div>
+            <div class="ac-grade">
+                ${cel('1ª compra', l.primeira ? dataBR(l.primeira) : '—')}
+                ${cel('Preço médio', num(l.pm))}
+                ${cel('Cotação', l.cot ? num(l.cot.preco) : '—')}
+                ${cel('Máxima', pc(l.max), classe(l.max))}
+                ${cel('Mínima', pc(l.min), classe(l.min))}
+                ${cel('Variação', pct(l.rentAtual), classe(l.rentAtual))}
+            </div>
+        </article>`).join('') || '<p class="sutil">Nenhum ativo em posição nas carteiras selecionadas.</p>';
+}
 
 function opcoesLinha(fmtEixo, rotulosLongos, fmtDica = fmtEixo, legenda = true) {
     return {
