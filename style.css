@@ -205,6 +205,47 @@ table.dados tfoot td { font-weight: 600; border-top: 1px solid var(--borda); bor
 .nota { max-width: 900px; }
 .nota-grafico { margin-top: 10px; }
 
+/* ---------------- Detalhe de um ativo ---------------- */
+.link-ativo { color: inherit; text-decoration: none; border-bottom: 1px dotted #4A5462; }
+.link-ativo:hover { color: #fff; border-bottom-color: var(--azul); }
+.sel-ativo-barra { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 18px; }
+.sel-ativo-barra select { min-width: 240px; }
+.outro-ativo { display: flex; gap: 8px; }
+.outro-ativo input { width: 190px; text-transform: uppercase; }
+#btn-ordem-ativo { margin-left: auto; }
+.det-topo { display: flex; flex-wrap: wrap; gap: 22px; }
+.det-cotacao { flex: 1 1 320px; display: flex; flex-direction: column; gap: 14px; }
+.det-mercado { flex: 2 1 520px; }
+.det-id { display: flex; align-items: center; gap: 14px; }
+.det-id h2 { font-size: 22px; }
+.det-logo { width: 44px; height: 44px; border-radius: 10px; background: #fff; object-fit: contain; padding: 4px; }
+.det-preco { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 16px; }
+.det-preco .grande { font-family: var(--mono); font-size: 34px; font-weight: 500; }
+.det-preco .var { font-family: var(--mono); font-size: 16px; }
+.det-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px 18px; }
+.det-grade div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.det-grade span { color: var(--sutil); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+.det-grade strong { font-family: var(--mono); font-weight: 500; font-size: 15px; white-space: nowrap; }
+.faixa52 { margin-top: 18px; display: grid; grid-template-columns: 100px minmax(0, 1fr); align-items: center; gap: 4px 14px; }
+.faixa52 > span { color: var(--sutil); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; grid-row: span 2; }
+.faixa52-barra { position: relative; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #F2737B, #E8A23A, #3FB97A); }
+.faixa52-barra i { position: absolute; top: -5px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: #fff; box-shadow: 0 0 0 2px var(--painel); }
+.faixa52-val { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12px; color: var(--sutil2); }
+.det-legenda { margin: -6px 0 12px; flex-wrap: wrap; }
+.marca-ordem { display: inline-block; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; }
+.marca-ordem.compra { border-bottom: 10px solid #3FB97A; }
+.marca-ordem.venda { border-top: 10px solid #F2737B; }
+.det-listas { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 22px; align-items: start; }
+.outro-ativo input::placeholder { text-transform: none; }
+.marca span { white-space: nowrap; }
+@media (max-width: 1480px) {
+    .topo-in { gap: 10px 18px; }
+    .nav-principal a { padding: 9px 10px; }
+}
+.det-mais { padding: 12px 22px; }
+.det-mais .btn.oculto { display: none; }
+@media (max-width: 1100px) { .det-listas { grid-template-columns: minmax(0, 1fr); } }
+
 /* ---------------- Gráficos: evolução dos ativos ---------------- */
 .subtitulo-aba { margin-top: -14px; }
 .chips-ativos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
@@ -246,6 +287,23 @@ table.dados tfoot td { font-weight: 600; border-top: 1px solid var(--borda); bor
     .tabela-ativos .ativo-nome, .dica-ordenar { display: none; }
 
     .subtitulo-aba { display: none; }
+    /* detalhe do ativo no celular */
+    .col-opc { display: none; }
+    .sel-ativo-barra { padding: 12px; gap: 10px; }
+    .sel-ativo-barra label.inline { width: 100%; }
+    .sel-ativo-barra select { flex: 1; min-width: 0; }
+    .outro-ativo { flex: 1; }
+    .outro-ativo input { flex: 1; width: auto; min-width: 0; }
+    #btn-ordem-ativo { margin-left: 0; width: 100%; }
+    .det-preco .grande { font-size: 28px; }
+    .det-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .det-mercado, .det-cotacao { flex: 1 1 100%; }
+    #aba-ativo table.dados th, #aba-ativo table.dados td { padding-left: 6px; padding-right: 6px; font-size: 13px; }
+    #aba-ativo table.dados th:first-child, #aba-ativo table.dados td:first-child { padding-left: 14px; }
+    #aba-ativo table.dados th:last-child, #aba-ativo table.dados td:last-child { padding-right: 14px; }
+    #aba-ativo .tag { padding: 2px 6px; font-size: 11px; }
+    #aba-ativo table.dados th { letter-spacing: 0; font-size: 11px; }
+    #aba-ativo .so-larga { display: none; }
     .chips-ativos { gap: 6px; }
     .chip-ativo { min-height: 40px; padding: 0 10px; gap: 8px; font-size: 13px; }
 

@@ -77,7 +77,7 @@ const ativoDe = (id) => DB.ativos.find(a => a.id === id);
 const carteiraDe = (id) => DB.carteiras.find(c => c.id === id);
 
 const TITULOS = {
-    visao: 'Visão geral', evolucao: 'Evolução', graficos: 'Evolução dos ativos', ordens: 'Ordens', proventos: 'Proventos',
+    visao: 'Visão geral', evolucao: 'Evolução', graficos: 'Evolução dos ativos', ativo: 'Detalhe do ativo', ordens: 'Ordens', proventos: 'Proventos',
     ativos: 'Ativos', carteiras: 'Carteiras', config: 'Configurações'
 };
 let abaAtual = 'visao';
@@ -127,7 +127,7 @@ function mostrarAba(aba) {
         .forEach(el => el.classList.toggle('ativo', el.dataset.aba === aba));
     $('aba-' + aba).classList.add('ativa');
     $('titulo-pagina').textContent = TITULOS[aba];
-    $('barra-filtros').classList.toggle('oculto', !['visao', 'evolucao', 'graficos'].includes(aba));
+    $('barra-filtros').classList.toggle('oculto', !['visao', 'evolucao', 'graficos', 'ativo'].includes(aba));
     fecharMais();
     window.scrollTo(0, 0);
     document.querySelector('.conteudo').scrollTop = 0;   // no celular quem rola é o .conteudo
@@ -138,6 +138,7 @@ function renderGraficosVisiveis() {
     if (abaAtual === 'visao') renderVisao();
     if (abaAtual === 'evolucao') renderEvolucao();
     if (abaAtual === 'graficos') renderGraficos();
+    if (abaAtual === 'ativo') renderDetalheAtivo();
 }
 
 function abrirMais() { $('menu-mais').classList.remove('oculto'); $('btn-mais').setAttribute('aria-expanded', 'true'); }
@@ -146,6 +147,8 @@ $('btn-mais').addEventListener('click', abrirMais);
 
 // cliques de navegação (menu do topo, barra do celular, menu "Mais", engrenagem)
 document.addEventListener('click', (e) => {
+    const ver = e.target.closest('[data-ver-ativo]');
+    if (ver) { e.preventDefault(); abrirDetalheAtivo(ver.dataset.verAtivo); return; }
     const link = e.target.closest('[data-aba]');
     if (link) { e.preventDefault(); mostrarAba(link.dataset.aba); return; }
     if (e.target.closest('[data-nova-ordem]')) {
@@ -521,7 +524,7 @@ function renderMercado() {
     const baixas = ordenado.filter(x => x.v < 0).reverse().slice(0, 5);
     const minhas = new Set([...calcularPosicoes().values()].filter(p => p.qtd > 0).map(p => normTicker(ativoDe(p.ativo_id)?.ticker)));
     const item = (x) => `<div class="mov-item">
-            <span class="nome"><strong>${esc(x.t)}</strong>${minhas.has(x.t) ? '<span class="na-carteira">na carteira</span>' : `<small>${esc(x.nome)}</small>`}</span>
+            <span class="nome"><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(x.t)}">${esc(x.t)}</a></strong>${minhas.has(x.t) ? '<span class="na-carteira">na carteira</span>' : `<small>${esc(x.nome)}</small>`}</span>
             <span class="preco">${num(x.preco)}</span>
             <span class="var ${classe(x.v)}">${seta(x.v)}${pct(x.v)}</span>
         </div>`;
@@ -950,7 +953,7 @@ function renderVisao() {
             const cor = agruparAloc === 'ativo' ? (cores.get(a?.ticker) || '#5B9DFF') : '#5B9DFF';
             const alerta = p.alerta ? ' <span class="prejuizo" title="Existe venda maior que a posição — confira as ordens">(!)</span>' : '';
             return `<tr class="${p.qtd === 0 ? 'zerada' : ''}">
-                <td><strong>${esc(a?.ticker)}</strong><span class="ativo-nome">${esc(a?.nome || '')}</span>${alerta}</td>
+                <td><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(a?.ticker)}">${esc(a?.ticker)}</a></strong><span class="ativo-nome">${esc(a?.nome || '')}</span>${alerta}</td>
                 <td class="num">${qtdFmt(p.qtd)}</td>
                 <td class="num">${p.qtd ? num(p.pm) : '—'}</td>
                 <td class="num">${cot ? num(cot.preco) : '—'}</td>
@@ -1003,7 +1006,7 @@ function renderVisao() {
         '<span class="m-titulo">Maiores posições</span><div class="painel" style="padding:4px 14px">' + maiores.map(g => {
             const rp = g.k > 0 ? (g.v / g.k - 1) * 100 : null;
             return `<div class="m-linha">
-                <span><strong>${esc(g.a?.ticker)}</strong><span class="qtd">${qtdFmt(g.qtd)}</span></span>
+                <span><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(g.a?.ticker)}">${esc(g.a?.ticker)}</a></strong><span class="qtd">${qtdFmt(g.qtd)}</span></span>
                 <span class="dir">${brlCurto(g.v)} <span class="${classe(rp)}">${rp != null ? pct(rp) : ''}</span></span>
             </div>`;
         }).join('') + '</div>';
@@ -1168,7 +1171,7 @@ function renderTabelaAtivos(cids, R) {
         const larg = Math.min(50, Math.abs(l.rendPct) / maxAbs * 50);
         const barra = `<span class="rend-barra"><i style="${l.rendPct >= 0 ? 'left:50%' : 'right:50%'};width:${larg.toFixed(1)}%;background:${l.rendPct >= 0 ? '#3FB97A' : '#F2737B'}"></i></span>`;
         return `<tr>
-            <td><strong>${esc(l.ticker)}</strong><span class="ativo-nome">${esc(l.a?.nome || '')}</span></td>
+            <td><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(l.ticker)}">${esc(l.ticker)}</a></strong><span class="ativo-nome">${esc(l.a?.nome || '')}</span></td>
             <td class="num">${qtdFmt(l.qtd)}</td>
             <td class="num">${num(l.pm)}</td>
             <td class="num">${num(l.custo)}</td>
@@ -1197,7 +1200,7 @@ function renderTabelaAtivos(cids, R) {
     $('m-evol-ativos').innerHTML = linhas.map(l => `
         <article class="ativo-card">
             <div class="ac-topo">
-                <div class="ac-nome"><strong>${esc(l.ticker)}</strong><small>${esc(l.a?.nome || '')}</small></div>
+                <div class="ac-nome"><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(l.ticker)}">${esc(l.ticker)}</a></strong><small>${esc(l.a?.nome || '')}</small></div>
                 <div class="ac-rend ${classe(l.rendPct)}">
                     <strong>${seta(l.rendPct)}${pct(l.rendPct)}</strong>
                     <small>${sinal(l.rend)}</small>
@@ -1356,7 +1359,7 @@ function renderGraficos() {
     });
     const pc = (v) => v == null ? '—' : pct(v);
     $('tb-graficos').innerHTML = linhas.map(l => `<tr>
-        <td><i class="cor-ativo" style="background:${l.cor}"></i><strong>${esc(l.t)}</strong><span class="ativo-nome">${esc(l.a?.nome || '')}</span></td>
+        <td><i class="cor-ativo" style="background:${l.cor}"></i><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(l.t)}">${esc(l.t)}</a></strong><span class="ativo-nome">${esc(l.a?.nome || '')}</span></td>
         <td class="num">${l.primeira ? dataBR(l.primeira).slice(0, 5) + '/' + l.primeira.slice(2, 4) : '—'}</td>
         <td class="num">${num(l.pm)}</td>
         <td class="num">${l.cot ? num(l.cot.preco) : '—'}</td>
@@ -1370,7 +1373,7 @@ function renderGraficos() {
     $('m-graficos').innerHTML = linhas.map(l => `
         <article class="ativo-card">
             <div class="ac-topo">
-                <div class="ac-nome"><strong><i class="cor-ativo" style="background:${l.cor}"></i>${esc(l.t)}</strong><small>${esc(l.a?.nome || '')}</small></div>
+                <div class="ac-nome"><strong><i class="cor-ativo" style="background:${l.cor}"></i><a href="#" class="link-ativo" data-ver-ativo="${esc(l.t)}">${esc(l.t)}</a></strong><small>${esc(l.a?.nome || '')}</small></div>
                 <div class="ac-rend ${classe(l.rentAtual)}"><strong>${seta(l.rentAtual)}${pct(l.rentAtual)}</strong><small>sobre o PM</small></div>
             </div>
             <div class="ac-grade">
@@ -1382,6 +1385,319 @@ function renderGraficos() {
                 ${cel('Variação', pct(l.rentAtual), classe(l.rentAtual))}
             </div>
         </article>`).join('') || '<p class="sutil">Nenhum ativo em posição nas carteiras selecionadas.</p>';
+}
+
+
+// ====================================================================
+// DETALHE DE UM ATIVO
+//  Cotação + dados de mercado + histórico (brapi: /api/quote/X?range=3mo&interval=1d,
+//  máximo do plano gratuito) unido aos fechamentos gravados no banco, posição,
+//  ordens, proventos e gráfico com preço médio e marcas de compra/venda.
+// ====================================================================
+const CHAVE_DET_ATIVO = 'det_ativo_sel';
+let detTicker = lerLocal(CHAVE_DET_ATIVO, '');
+let detMedida = 'preco';
+let detFechTodos = false;
+const DETALHE = {};   // ticker -> { em, r, semHistorico } | { em, erro }
+
+function abrirDetalheAtivo(ticker) {
+    detTicker = normTicker(ticker);
+    gravarLocal(CHAVE_DET_ATIVO, detTicker);
+    detFechTodos = false;
+    if (abaAtual === 'ativo') renderDetalheAtivo(); else mostrarAba('ativo');
+}
+
+async function consultarDetalhe(t, forcar) {
+    const d = DETALHE[t];
+    if (!forcar && d && Date.now() - d.em < intervaloAutoMs()) return d;
+    const token = lerLocal(CHAVE_TOKEN, '');
+    const tk = token ? '&token=' + encodeURIComponent(token) : '';
+    const base = `https://brapi.dev/api/quote/${encodeURIComponent(t)}`;
+    let erro = '';
+    for (const [qs, semHist] of [['?range=3mo&interval=1d', false], ['?', true]]) {
+        try {
+            const res = await buscar(base + qs + tk, {}, 15000);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const r = (await res.json()).results?.[0];
+            if (!r || r.regularMarketPrice == null) throw new Error('sem cotação');
+            DETALHE[t] = { em: Date.now(), r, semHistorico: semHist || !(r.historicalDataPrice || []).length };
+            // aproveita para atualizar a cotação usada no resto do portal
+            COTACOES[t] = { preco: Number(r.regularMarketPrice), variacao: Number(r.regularMarketChangePercent || 0),
+                anterior: r.regularMarketPreviousClose != null ? Number(r.regularMarketPreviousClose) : null,
+                mercado: tempoMs(r.regularMarketTime), em: Date.now() };
+            return DETALHE[t];
+        } catch (e) { erro = e.message; }
+    }
+    DETALHE[t] = { em: Date.now(), erro };
+    return DETALHE[t];
+}
+
+function opcoesSelAtivo() {
+    const cids = cidsEscopo();
+    const emPos = new Map();
+    for (const p of calcularPosicoes().values()) {
+        if (cids.has(p.carteira_id) && p.qtd > 0) emPos.set(p.ativo_id, (emPos.get(p.ativo_id) || 0) + valorDe(p).valor);
+    }
+    const comPos = [...emPos.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => ativoDe(id)).filter(Boolean);
+    const outros = DB.ativos.filter(a => !emPos.has(a.id)).sort((a, b) => a.ticker.localeCompare(b.ticker));
+    return { comPos, outros };
+}
+
+function renderSelAtivo() {
+    const { comPos, outros } = opcoesSelAtivo();
+    const op = (a) => `<option value="${esc(a.ticker)}">${esc(a.ticker)}${a.nome ? ' — ' + esc(a.nome) : ''}</option>`;
+    const conhecido = [...comPos, ...outros].some(a => a.ticker === detTicker);
+    $('sel-ativo').innerHTML =
+        (comPos.length ? `<optgroup label="Em carteira">${comPos.map(op).join('')}</optgroup>` : '') +
+        (outros.length ? `<optgroup label="Outros cadastrados">${outros.map(op).join('')}</optgroup>` : '') +
+        (detTicker && !conhecido ? `<optgroup label="Consultado"><option value="${esc(detTicker)}">${esc(detTicker)}</option></optgroup>` : '');
+    if (!detTicker) detTicker = (comPos[0] || outros[0])?.ticker || '';
+    $('sel-ativo').value = detTicker;
+}
+
+$('sel-ativo').addEventListener('change', (e) => abrirDetalheAtivo(e.target.value));
+$('form-outro-ativo').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const t = normTicker($('outro-ativo').value);
+    if (!t) return;
+    $('outro-ativo').value = '';
+    abrirDetalheAtivo(t);
+});
+$('btn-ordem-ativo').addEventListener('click', async () => {
+    let a = DB.ativos.find(x => x.ticker === detTicker);
+    if (!a) {
+        if (!confirm(`${detTicker} não está cadastrado. Cadastrar agora para lançar a ordem?`)) return;
+        a = await cadastrarAtivoRapido(detTicker);
+        if (!a) return;
+    }
+    mostrarAba('ordens');
+    cancelarEdicao('ordem');
+    buscaOrdem.definir(a.id);
+    atualizarInfoOrdem();
+    $('ordem-qtd').focus();
+});
+$('btn-fech-todos').addEventListener('click', () => { detFechTodos = !detFechTodos; renderDetalheAtivo(); });
+document.addEventListener('click', (e) => {
+    const b = e.target.closest('#seg-det-medida [data-det-medida]');
+    if (!b) return;
+    detMedida = b.dataset.detMedida;
+    document.querySelectorAll('#seg-det-medida button').forEach(x => x.classList.toggle('ativo', x === b));
+    renderDetalheAtivo();
+});
+
+let detSeq = 0;
+async function renderDetalheAtivo(forcar = false) {
+    if (abaAtual !== 'ativo') return;
+    renderSelAtivo();
+    const t = detTicker;
+    if (!t) {
+        $('det-cotacao').innerHTML = '<p class="sutil">Cadastre um ativo ou digite um ticker acima.</p>';
+        ['det-mercado', 'det-posicao', 'tb-det-ordens', 'tb-det-prov', 'tb-det-fech'].forEach(id => $(id).innerHTML = '');
+        return;
+    }
+    const seq = ++detSeq;
+    // 1) desenha já com o que tem; 2) busca histórico/dados de mercado e redesenha
+    desenharDetalhe(t, DETALHE[t]);
+    const d = await consultarDetalhe(t, forcar);
+    if (seq === detSeq && abaAtual === 'ativo') desenharDetalhe(t, d);
+}
+
+function desenharDetalhe(t, det) {
+    const cids = cidsEscopo();
+    const a = DB.ativos.find(x => x.ticker === t);
+    const r = det?.r || {};
+    const cot = COTACOES[t];
+    const preco = r.regularMarketPrice != null ? Number(r.regularMarketPrice) : cot?.preco ?? null;
+    const varDia = r.regularMarketChangePercent != null ? Number(r.regularMarketChangePercent) : cot?.variacao ?? null;
+    const nome = r.longName || r.shortName || a?.nome || '';
+    const n = (v, dec = 2) => v == null || !isFinite(v) ? '—' : num(v, dec);
+
+    // ---------- aviso ----------
+    const av = $('det-aviso');
+    const msgAviso = det?.erro
+        ? `Não consegui buscar ${t} na brapi (${det.erro}). ${lerLocal(CHAVE_TOKEN, '') ? 'Confira se o ticker existe.' : 'Sem token só PETR4, VALE3, MGLU3 e ITUB4 funcionam — cadastre o token em Configurações.'}`
+        : det?.semHistorico ? 'A brapi não devolveu o histórico de preços para o seu plano; o gráfico usa só os fechamentos gravados pelo portal.' : '';
+    av.textContent = msgAviso; av.classList.toggle('oculto', !msgAviso);
+
+    // ---------- cotação ----------
+    $('det-cotacao').innerHTML = `
+        <div class="det-id">
+            ${r.logourl ? `<img src="${esc(r.logourl)}" alt="" class="det-logo" onerror="this.remove()">` : ''}
+            <div><h2>${esc(t)}</h2><span class="sutil">${esc(nome)}${a ? ' · ' + (TIPOS_ATIVO[a.tipo] || a.tipo) : ''}</span></div>
+        </div>
+        <div class="det-preco">
+            <span class="grande">${preco != null ? brl.format(preco) : '—'}</span>
+            ${varDia != null ? `<span class="var ${classe(varDia)}">${seta(varDia)}${pct(varDia)} hoje</span>` : ''}
+        </div>
+        <span class="sutil">${r.regularMarketTime || cot?.mercado ? 'cotação de ' + horaSP(tempoMs(r.regularMarketTime) || cot.mercado) + ' · atraso conforme o plano da brapi' : det ? '' : 'carregando…'}</span>`;
+
+    // ---------- dados de mercado ----------
+    const min52 = r.fiftyTwoWeekLow, max52 = r.fiftyTwoWeekHigh;
+    const pos52 = preco != null && min52 != null && max52 > min52 ? Math.max(0, Math.min(100, (preco - min52) / (max52 - min52) * 100)) : null;
+    const item = (rot, val) => `<div><span>${rot}</span><strong>${val}</strong></div>`;
+    $('det-mercado').innerHTML = `
+        <div class="painel-topo"><h2>Informações de mercado</h2></div>
+        <div class="det-grade">
+            ${item('Abertura', n(r.regularMarketOpen))}
+            ${item('Fech. anterior', n(r.regularMarketPreviousClose ?? cot?.anterior))}
+            ${item('Máxima do dia', n(r.regularMarketDayHigh))}
+            ${item('Mínima do dia', n(r.regularMarketDayLow))}
+            ${item('Volume (qtd)', r.regularMarketVolume ? Number(r.regularMarketVolume).toLocaleString('pt-BR') : '—')}
+            ${item('Volume (R$)', r.regularMarketVolume && preco ? bilhoes(r.regularMarketVolume * preco) : '—')}
+            ${item('Valor de mercado', r.marketCap ? bilhoes(Number(r.marketCap)) : '—')}
+            ${item('P/L', n(r.priceEarnings))}
+            ${item('LPA', n(r.earningsPerShare))}
+        </div>
+        ${pos52 != null ? `<div class="faixa52">
+            <span>52 semanas</span>
+            <div class="faixa52-barra"><i style="left:${pos52.toFixed(1)}%"></i></div>
+            <div class="faixa52-val"><span>mín ${n(min52)}</span><span>máx ${n(max52)}</span></div>
+        </div>` : ''}`;
+
+    // ---------- posição ----------
+    const posicoes = [...calcularPosicoes().values()].filter(p => cids.has(p.carteira_id) && ativoDe(p.ativo_id)?.ticker === t);
+    let qtd = 0, custo = 0, real = 0, prov = 0;
+    for (const p of posicoes) { qtd += p.qtd; custo += p.custo; real += p.realizado; prov += p.proventos; }
+    const pm = qtd > 0 ? custo / qtd : null;
+    const valor = qtd > 0 ? qtd * (preco ?? pm) : 0;
+    const rend = valor - custo, rendPct = custo > 0 ? rend / custo * 100 : null;
+    let totalCart = 0;
+    for (const p of calcularPosicoes().values()) if (cids.has(p.carteira_id) && p.qtd > 0) totalCart += valorDe(p).valor;
+    $('det-posicao').innerHTML = !posicoes.length
+        ? kpi('Sua posição', '—', a ? 'Nenhuma ordem deste ativo nas carteiras selecionadas.' : 'Ativo não cadastrado — use "+ Ordem deste ativo" para começar.')
+        : kpi('Quantidade', qtdFmt(qtd), pm != null ? `preço médio ${brl.format(pm)}` : 'posição zerada') +
+          kpi('Investido', brl.format(custo), totalCart && qtd ? `${num(valor / totalCart * 100, 1)}% das carteiras` : '') +
+          kpi('Valor atual', brl.format(valor), preco != null && qtd ? `${qtdFmt(qtd)} × ${num(preco)}` : '') +
+          kpi('Rendimento s/ PM', rendPct != null ? pct(rendPct) : '—', qtd ? `${seta(rend)}${sinalBrl(rend)}` : '', classe(rendPct), classe(rend)) +
+          kpi('Realizado + proventos', sinalBrl(real + prov), `vendas ${sinalBrl(real)} · proventos ${brl.format(prov)}`, classe(real + prov));
+
+    // ---------- histórico: brapi + fechamentos gravados + agora ----------
+    const hist = new Map();   // data -> {close, open, high, low, vol}
+    for (const h of (r.historicalDataPrice || [])) {
+        const ms = typeof h.date === 'number' ? (h.date < 1e12 ? h.date * 1000 : h.date) : Date.parse(h.date);
+        if (!ms || h.close == null) continue;
+        hist.set(agoraSP(ms).data, { close: Number(h.close), open: h.open, high: h.high, low: h.low, vol: h.volume });
+    }
+    for (const f of DB.fechamentos) {
+        const v = f.precos?.[t];
+        if (v != null && !hist.has(f.data)) hist.set(f.data, { close: Number(v), salvo: true });
+    }
+    const hoje = hojeSP();
+    if (preco != null) {
+        const h = hist.get(hoje) || {};
+        hist.set(hoje, { ...h, close: preco, open: r.regularMarketOpen ?? h.open, high: r.regularMarketDayHigh ?? h.high,
+                         low: r.regularMarketDayLow ?? h.low, vol: r.regularMarketVolume ?? h.vol, agora: true });
+    }
+    let datas = [...hist.keys()].sort();
+    if (periodoDias > 0) { const corte = somaDias(hoje, -periodoDias); datas = datas.filter(d => d >= corte); }
+
+    // preço médio e quantidade em cada data (só ordens até aquela data)
+    const pmDia = datas.map(d => {
+        let q = 0, c = 0;
+        for (const p of calcularPosicoes(d).values()) {
+            if (cids.has(p.carteira_id) && p.qtd > 0 && ativoDe(p.ativo_id)?.ticker === t) { q += p.qtd; c += p.custo; }
+        }
+        return q > 0 ? c / q : null;
+    });
+
+    // ---------- ordens (com PM após cada uma e resultado das vendas) ----------
+    const ordens = DB.ordens.filter(o => cids.has(o.carteira_id) && ativoDe(o.ativo_id)?.ticker === t);
+    const estado = {};   // por carteira
+    const linhasOrd = ordens.map(o => {
+        const s = estado[o.carteira_id] || (estado[o.carteira_id] = { q: 0, c: 0, pm: 0 });
+        const q = Number(o.quantidade), pr = Number(o.preco), tx = Number(o.taxas || 0);
+        let resultado = null;
+        if (o.tipo === 'C') { s.c += q * pr + tx; s.q += q; s.pm = s.c / s.q; }
+        else { resultado = q * (pr - s.pm) - tx; s.q -= q; s.c = s.pm * s.q; if (s.q <= 1e-9) { s.q = 0; s.c = 0; s.pm = 0; } }
+        return { o, total: o.tipo === 'C' ? q * pr + tx : q * pr - tx, pmApos: s.q > 0 ? s.pm : null, resultado };
+    });
+    $('tb-det-ordens').innerHTML = [...linhasOrd].reverse().map(l => `<tr>
+        <td>${dataBR(l.o.data_ordem).slice(0, 6) + l.o.data_ordem.slice(2, 4)}</td>
+        <td class="col-opc">${esc(carteiraDe(l.o.carteira_id)?.nome)}</td>
+        <td><span class="tag ${l.o.tipo === 'C' ? 'compra' : 'venda'}">${l.o.tipo === 'C' ? 'Compra' : 'Venda'}</span></td>
+        <td class="num">${qtdFmt(l.o.quantidade)}</td>
+        <td class="num">${num(l.o.preco)}</td>
+        <td class="num col-opc">${num(l.total)}</td>
+        <td class="num col-opc">${l.pmApos != null ? num(l.pmApos) : '—'}</td>
+        <td class="num ${classe(l.resultado)}">${l.resultado != null ? (l.resultado > 0 ? '+' : l.resultado < 0 ? '−' : '') + num(Math.abs(l.resultado)) : '—'}</td>
+    </tr>`).join('') || '<tr><td colspan="8" class="vazio">Nenhuma ordem deste ativo.</td></tr>';
+    const comprado = linhasOrd.filter(l => l.o.tipo === 'C').reduce((s, l) => s + l.total, 0);
+    $('det-ordens-info').textContent = ordens.length ? `${ordens.length} ordem(ns) · comprado ${brl.format(comprado)}` : '';
+
+    // ---------- proventos ----------
+    const nomesProv = { DIVIDENDO: 'Dividendo', JCP: 'JCP', RENDIMENTO: 'Rendimento' };
+    const provs = DB.dividendos.filter(d => cids.has(d.carteira_id) && ativoDe(d.ativo_id)?.ticker === t);
+    $('tb-det-prov').innerHTML = provs.map(d => `<tr>
+        <td>${dataBR(d.data_pagamento)}</td>
+        <td>${nomesProv[d.tipo] || d.tipo}<br><small class="sutil">${esc(carteiraDe(d.carteira_id)?.nome)}</small></td>
+        <td class="num lucro">${brl.format(d.valor_total)}</td>
+    </tr>`).join('') || '<tr><td colspan="3" class="vazio">Nenhum provento deste ativo.</td></tr>';
+    const totProv = provs.reduce((s, d) => s + Number(d.valor_total), 0);
+    $('det-prov-info').textContent = provs.length ? `total ${brl.format(totProv)}${custo > 0 ? ' · ' + num(totProv / custo * 100) + '% do investido' : ''}` : '';
+
+    // ---------- gráfico ----------
+    const closes = datas.map(d => hist.get(d).close);
+    const idxData = (d) => datas.findIndex(x => x >= d);
+    const marcas = { C: datas.map(() => null), V: datas.map(() => null) };
+    const textos = { C: datas.map(() => []), V: datas.map(() => []) };
+    for (const l of linhasOrd) {
+        const i = idxData(l.o.data_ordem);
+        if (i < 0 || (i === 0 && l.o.data_ordem < datas[0])) continue;
+        const valorY = detMedida === 'preco' ? Number(l.o.preco) : (pmDia[i] ? (Number(l.o.preco) / pmDia[i] - 1) * 100 : 0);
+        marcas[l.o.tipo][i] = +valorY.toFixed(2);
+        textos[l.o.tipo][i].push(`${l.o.tipo === 'C' ? 'Compra' : 'Venda'} ${qtdFmt(l.o.quantidade)} × ${num(l.o.preco)} (${dataBR(l.o.data_ordem)})`);
+    }
+    const rotulos = datas.map(d => d === hoje && hist.get(d).agora ? 'Hoje' : dataBR(d).slice(0, 5));
+    const rotulosLongos = datas.map(d => dataBR(d) + (d === hoje && hist.get(d).agora ? ' (cotação atual)' : ''));
+    const pts = datas.length > 50 ? 0 : 2;
+    const datasets = detMedida === 'preco' ? [
+        { label: 'Fechamento', data: closes, borderColor: '#5B9DFF', backgroundColor: 'rgba(91,157,255,.10)', fill: true, tension: .2, pointRadius: pts, borderWidth: 2 },
+        { label: 'Seu preço médio', data: pmDia.map(v => v != null ? +v.toFixed(2) : null), borderColor: '#A9B2BE', borderDash: [5, 4], stepped: true, pointRadius: 0, borderWidth: 1.5, spanGaps: false }
+    ] : [
+        { label: 'Rendimento s/ PM', data: datas.map((d, i) => pmDia[i] ? +((closes[i] / pmDia[i] - 1) * 100).toFixed(2) : null), borderColor: '#5B9DFF', backgroundColor: 'rgba(91,157,255,.10)', fill: true, tension: .2, pointRadius: pts, borderWidth: 2, spanGaps: false }
+    ];
+    datasets.push(
+        { label: 'Compra', data: marcas.C, textos: textos.C, showLine: false, pointStyle: 'triangle', pointRadius: 8, pointHoverRadius: 10, backgroundColor: '#3FB97A', borderColor: '#0E1116', borderWidth: 1 },
+        { label: 'Venda', data: marcas.V, textos: textos.V, showLine: false, pointStyle: 'triangle', rotation: 180, pointRadius: 8, pointHoverRadius: 10, backgroundColor: '#F2737B', borderColor: '#0E1116', borderWidth: 1 }
+    );
+    const fmtEixo = detMedida === 'preco' ? (v => num(v)) : (v => num(v, 0) + '%');
+    const fmtDica = detMedida === 'preco' ? (v => brl.format(v)) : (v => pct(v));
+    const opcoes = opcoesLinha(fmtEixo, rotulosLongos, fmtDica, false);
+    opcoes.spanGaps = true;
+    opcoes.plugins.tooltip.filter = (c) => c.raw != null;
+    opcoes.plugins.tooltip.callbacks.label = (c) => c.dataset.textos
+        ? c.dataset.textos[c.dataIndex].map(x => ' ' + x)
+        : ` ${c.dataset.label}: ${fmtDica(c.raw)}`;
+    if (detMedida === 'rent') opcoes.scales.y.grid = { color: (c) => c.tick?.value === 0 ? '#5A6574' : '#1D232B' };
+    if (window.Chart) desenhar('g-det', { type: 'line', data: { labels: rotulos, datasets }, options: opcoes });
+    $('det-graf-titulo').textContent = detMedida === 'preco' ? 'Histórico de preço' : 'Rendimento sobre o seu preço médio';
+    const varPer = closes.length > 1 ? (closes.at(-1) / closes[0] - 1) * 100 : null;
+    $('det-graf-nota').innerHTML = !datas.length ? 'Sem histórico ainda.' :
+        `De ${dataBR(datas[0])} a ${dataBR(datas.at(-1))}: <span class="${classe(varPer)}">${varPer != null ? pct(varPer) : '—'}</span> no preço` +
+        `${closes.length ? ` · mín ${num(Math.min(...closes))} · máx ${num(Math.max(...closes))}` : ''}. ` +
+        (det?.semHistorico || det?.erro ? 'Histórico dos fechamentos gravados pelo portal.' : 'Histórico: brapi (até 3 meses no plano gratuito) + fechamentos gravados pelo portal.');
+
+    // ---------- tabela de fechamentos ----------
+    const desc = [...datas].reverse();
+    const mostrar = detFechTodos ? desc : desc.slice(0, 20);
+    $('tb-det-fech').innerHTML = mostrar.map(d => {
+        const i = datas.indexOf(d), h = hist.get(d);
+        const ant = i > 0 ? closes[i - 1] : null;
+        const v = h.agora && varDia != null ? varDia : ant ? (h.close / ant - 1) * 100 : null;
+        const rp = pmDia[i] ? (h.close / pmDia[i] - 1) * 100 : null;
+        return `<tr>
+            <td>${dataBR(d).slice(0, 6) + d.slice(2, 4)}${h.agora ? ' <span class="sutil so-larga">(agora)</span>' : ''}</td>
+            <td class="num">${num(h.close)}</td>
+            <td class="num ${classe(v)}">${v != null ? pct(v) : '—'}</td>
+            <td class="num col-opc">${n(h.open)}</td><td class="num col-opc">${n(h.high)}</td><td class="num col-opc">${n(h.low)}</td>
+            <td class="num col-opc">${h.vol ? Number(h.vol).toLocaleString('pt-BR') : '—'}</td>
+            <td class="num col-opc">${pmDia[i] ? num(pmDia[i]) : '—'}</td>
+            <td class="num ${classe(rp)}">${rp != null ? pct(rp) : '—'}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="9" class="vazio">Sem fechamentos.</td></tr>';
+    $('det-fech-info').textContent = datas.length ? `${datas.length} pregões` : '';
+    $('btn-fech-todos').classList.toggle('oculto', desc.length <= 20);
+    $('btn-fech-todos').textContent = detFechTodos ? 'Mostrar só os 20 últimos' : `Mostrar todos (${desc.length})`;
 }
 
 function opcoesLinha(fmtEixo, rotulosLongos, fmtDica = fmtEixo, legenda = true) {

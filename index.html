@@ -7,11 +7,11 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=12: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
-    <link rel="stylesheet" href="style.css?v=12">
+    <!-- ?v=13: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <link rel="stylesheet" href="style.css?v=13">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=12"></script>
+    <script src="config.js?v=13"></script>
 </head>
 <body>
 
@@ -42,6 +42,7 @@
                 <a href="#" data-aba="visao" class="ativo">Visão geral</a>
                 <a href="#" data-aba="evolucao">Evolução</a>
                 <a href="#" data-aba="graficos">Gráficos</a>
+                <a href="#" data-aba="ativo">Por ativo</a>
                 <a href="#" data-aba="ordens">Ordens</a>
                 <a href="#" data-aba="proventos">Proventos</a>
                 <a href="#" data-aba="ativos">Ativos</a>
@@ -258,6 +259,81 @@
             </section>
         </section>
 
+        <!-- ================= DETALHE DE UM ATIVO ================= -->
+        <section id="aba-ativo" class="aba-conteudo">
+            <div class="painel sel-ativo-barra">
+                <label class="inline">Ativo <select id="sel-ativo"></select></label>
+                <form id="form-outro-ativo" class="inline outro-ativo">
+                    <input type="text" id="outro-ativo" placeholder="outro ticker (ex.: WEGE3)" maxlength="12" autocomplete="off" aria-label="Ver outro ticker">
+                    <button type="submit" class="btn btn-sec">Ver</button>
+                </form>
+                <button type="button" id="btn-ordem-ativo" class="btn">+ Ordem deste ativo</button>
+            </div>
+            <div id="det-aviso" class="aviso oculto"></div>
+
+            <div class="det-topo">
+                <section id="det-cotacao" class="painel det-cotacao"></section>
+                <section id="det-mercado" class="painel det-mercado"></section>
+            </div>
+            <section id="det-posicao" class="kpis" aria-label="Sua posição"></section>
+
+            <section class="painel">
+                <div class="painel-topo">
+                    <h2 id="det-graf-titulo">Histórico de preço</h2>
+                    <div id="seg-det-medida" class="segmentado mini" role="group" aria-label="Medida">
+                        <button type="button" data-det-medida="preco" class="ativo">Preço</button>
+                        <button type="button" data-det-medida="rent">Rendimento s/ PM</button>
+                    </div>
+                </div>
+                <div class="legenda det-legenda">
+                    <span><i class="leg-linha" style="background:#5B9DFF"></i>Fechamento</span>
+                    <span><i class="leg-tracejado"></i>Seu preço médio</span>
+                    <span><i class="marca-ordem compra"></i>Compra</span>
+                    <span><i class="marca-ordem venda"></i>Venda</span>
+                </div>
+                <div class="canvas-box alto"><canvas id="g-det" role="img" aria-label="Gráfico do histórico de preço do ativo com preço médio e ordens"></canvas></div>
+                <p id="det-graf-nota" class="sutil nota-grafico"></p>
+            </section>
+
+            <div class="det-listas">
+                <section class="painel sem-padding">
+                    <div class="painel-topo com-padding"><h2>Ordens</h2><span id="det-ordens-info" class="sutil"></span></div>
+                    <div class="tabela-wrap">
+                        <table class="dados">
+                            <thead><tr><th>Data</th><th class="col-opc">Carteira</th><th>Tipo</th><th class="num">Quant.</th><th class="num">Preço</th>
+                                <th class="num col-opc">Total</th><th class="num col-opc">PM após</th><th class="num">Resultado</th></tr></thead>
+                            <tbody id="tb-det-ordens"></tbody>
+                        </table>
+                    </div>
+                </section>
+                <section class="painel sem-padding">
+                    <div class="painel-topo com-padding"><h2>Proventos</h2><span id="det-prov-info" class="sutil"></span></div>
+                    <div class="tabela-wrap">
+                        <table class="dados">
+                            <thead><tr><th>Pagamento</th><th>Tipo / carteira</th><th class="num">Valor</th></tr></thead>
+                            <tbody id="tb-det-prov"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <section class="painel sem-padding">
+                <div class="painel-topo com-padding">
+                    <h2>Histórico de fechamentos</h2>
+                    <span id="det-fech-info" class="sutil"></span>
+                </div>
+                <div class="tabela-wrap">
+                    <table class="dados">
+                        <thead><tr><th>Data</th><th class="num">Fechamento</th><th class="num">Var. dia</th>
+                            <th class="num col-opc">Abertura</th><th class="num col-opc">Máxima</th><th class="num col-opc">Mínima</th><th class="num col-opc">Volume</th>
+                            <th class="num col-opc">Seu PM</th><th class="num">Rend. s/ PM</th></tr></thead>
+                        <tbody id="tb-det-fech"></tbody>
+                    </table>
+                </div>
+                <div class="det-mais"><button type="button" id="btn-fech-todos" class="btn btn-sec oculto">Mostrar todos</button></div>
+            </section>
+        </section>
+
         <!-- ================= ORDENS ================= -->
         <section id="aba-ordens" class="aba-conteudo">
             <form id="form-ordem" class="painel form-grid">
@@ -442,6 +518,7 @@
     <div id="menu-mais" class="folha oculto">
         <div class="folha-fundo" data-fechar-mais></div>
         <div class="folha-conteudo" role="dialog" aria-label="Mais opções">
+            <a href="#" data-aba="ativo">Detalhe por ativo</a>
             <a href="#" data-aba="graficos">Gráficos dos ativos</a>
             <a href="#" data-aba="proventos">Proventos</a>
             <a href="#" data-aba="ativos">Ativos</a>
@@ -452,6 +529,6 @@
     </div>
 </div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=13"></script>
 </body>
 </html>
