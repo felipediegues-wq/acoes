@@ -208,6 +208,14 @@ table.dados tfoot td { font-weight: 600; border-top: 1px solid var(--borda); bor
 .nota { max-width: 900px; }
 .nota-grafico { margin-top: 10px; }
 
+/* ---------------- Detalhe: evolução do dia ---------------- */
+.dia-ativo-numeros { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 12px 16px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--linha); }
+.dia-ativo-numeros div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.dia-ativo-numeros span { color: var(--sutil); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; white-space: nowrap; }
+.dia-ativo-numeros strong { font-family: var(--mono); font-weight: 500; font-size: 15px; white-space: nowrap; }
+@media (max-width: 1100px) { .dia-ativo-numeros { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .dia-ativo-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* ---------------- Evolução: quadro "Hoje" ---------------- */
 .tabela-dia { min-width: 1080px; }
 .col-faixa { width: 130px; }

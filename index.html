@@ -7,11 +7,11 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=15: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
-    <link rel="stylesheet" href="style.css?v=15">
+    <!-- ?v=16: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <link rel="stylesheet" href="style.css?v=16">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=15"></script>
+    <script src="config.js?v=16"></script>
 </head>
 <body>
 
@@ -318,6 +318,20 @@
 
             <section class="painel">
                 <div class="painel-topo">
+                    <h2>Hoje</h2>
+                    <div class="legenda">
+                        <span><i class="leg-linha" style="background:#3FB97A"></i>Preço</span>
+                        <span><i class="leg-tracejado"></i>Fechamento anterior</span>
+                        <span id="dia-ativo-leg-pm"><i class="leg-tracejado" style="border-top-color:#B58CF0"></i>Seu preço médio</span>
+                    </div>
+                </div>
+                <div id="dia-ativo-numeros" class="dia-ativo-numeros"></div>
+                <div class="canvas-box"><canvas id="g-dia-ativo" role="img" aria-label="Gráfico do preço do ativo ao longo do dia"></canvas></div>
+                <p id="dia-ativo-nota" class="sutil nota-grafico"></p>
+            </section>
+
+            <section class="painel">
+                <div class="painel-topo">
                     <h2 id="det-graf-titulo">Histórico de preço</h2>
                     <div id="seg-det-medida" class="segmentado mini" role="group" aria-label="Medida">
                         <button type="button" data-det-medida="preco" class="ativo">Preço</button>
@@ -568,6 +582,6 @@
     </div>
 </div>
 
-<script src="app.js?v=15"></script>
+<script src="app.js?v=16"></script>
 </body>
 </html>

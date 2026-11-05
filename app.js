@@ -333,6 +333,7 @@ async function atualizarCotacoes(forcar) {
     }
     gravarLocal(CHAVE_CACHE, cache);
     COTACOES = cache;
+    for (const t of pendentes) if (cache[t]) registrarIntradia(t, cache[t]);
     atualizarInfoCotacao();
     renderIbovTopo();
 
@@ -1561,7 +1562,12 @@ async function consultarDetalhe(t, forcar) {
             // aproveita para atualizar a cotação usada no resto do portal
             COTACOES[t] = { preco: Number(r.regularMarketPrice), variacao: Number(r.regularMarketChangePercent || 0),
                 anterior: r.regularMarketPreviousClose != null ? Number(r.regularMarketPreviousClose) : null,
-                mercado: tempoMs(r.regularMarketTime), em: Date.now() };
+                mercado: tempoMs(r.regularMarketTime), em: Date.now(),
+                abertura: r.regularMarketOpen != null ? Number(r.regularMarketOpen) : null,
+                maxima: r.regularMarketDayHigh != null ? Number(r.regularMarketDayHigh) : null,
+                minima: r.regularMarketDayLow != null ? Number(r.regularMarketDayLow) : null,
+                volume: r.regularMarketVolume != null ? Number(r.regularMarketVolume) : null };
+            registrarIntradia(t, COTACOES[t]);
             return DETALHE[t];
         } catch (e) { erro = e.message; }
     }
@@ -1635,8 +1641,142 @@ async function renderDetalheAtivo(forcar = false) {
     const seq = ++detSeq;
     // 1) desenha já com o que tem; 2) busca histórico/dados de mercado e redesenha
     desenharDetalhe(t, DETALHE[t]);
+    desenharDia(t);
     const d = await consultarDetalhe(t, forcar);
     if (seq === detSeq && abaAtual === 'ativo') desenharDetalhe(t, d);
+    await consultarIntradia(t, forcar);
+    if (seq === detSeq && abaAtual === 'ativo') desenharDia(t);
+}
+
+// ====================================================================
+// DETALHE: evolução do dia (gráfico intradiário)
+//  1º tenta a brapi (range=1d&interval=5m — pode exigir plano pago);
+//  senão usa os pontos que o próprio portal registrou neste navegador
+//  a cada busca de cotação durante o pregão.
+// ====================================================================
+const CHAVE_INTRADIA = 'intradia_v1';
+const INTRADIA = {};   // ticker -> { em, pts:[[ms, preco]] } | { em, erro }
+
+function registrarIntradia(t, c) {
+    if (!c || c.preco == null || cotacaoDeOntem(t)) return;
+    const a = agoraSP();
+    if (!a.diaUtil || a.minutos < 10 * 60 || a.minutos > FECHAMENTO_MIN) return;
+    let reg = lerLocal(CHAVE_INTRADIA, {});
+    if (reg.data !== a.data) reg = { data: a.data, pts: {} };
+    const lista = reg.pts[t] || (reg.pts[t] = []);
+    const ms = c.em || Date.now();
+    const ult = lista[lista.length - 1];
+    if (ult && ms - ult[0] < 60 * 1000) ult[1] = c.preco;     // mesma busca: só atualiza
+    else lista.push([ms, c.preco]);
+    if (lista.length > 400) lista.splice(0, lista.length - 400);
+    gravarLocal(CHAVE_INTRADIA, reg);
+}
+
+function pontosRegistrados(t) {
+    const reg = lerLocal(CHAVE_INTRADIA, {});
+    return reg.data === hojeSP() ? (reg.pts?.[t] || []) : [];
+}
+
+async function consultarIntradia(t, forcar) {
+    const d = INTRADIA[t];
+    if (!forcar && d && Date.now() - d.em < (d.erro ? 30 * 60 * 1000 : 5 * 60 * 1000)) return d;
+    const token = lerLocal(CHAVE_TOKEN, '');
+    try {
+        const res = await buscar(`https://brapi.dev/api/quote/${encodeURIComponent(t)}?range=1d&interval=5m` +
+                                 (token ? '&token=' + encodeURIComponent(token) : ''), {}, 15000);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const r = (await res.json()).results?.[0];
+        const hoje = hojeSP();
+        const pts = (r?.historicalDataPrice || []).map(h => {
+            const ms = typeof h.date === 'number' ? (h.date < 1e12 ? h.date * 1000 : h.date) : Date.parse(h.date);
+            return [ms, h.close != null ? Number(h.close) : null];
+        }).filter(([ms, v]) => ms && v != null && agoraSP(ms).data === hoje).sort((x, y) => x[0] - y[0]);
+        if (pts.length < 2) throw new Error('sem pontos intradiários');
+        INTRADIA[t] = { em: Date.now(), pts };
+    } catch (e) {
+        INTRADIA[t] = { em: Date.now(), erro: e.message };
+    }
+    return INTRADIA[t];
+}
+
+function desenharDia(t) {
+    const cids = cidsEscopo();
+    const c = COTACOES[t];
+    const det = DETALHE[t]?.r || {};
+    const anterior = c?.anterior ?? (det.regularMarketPreviousClose != null ? Number(det.regularMarketPreviousClose) : null);
+    const abertura = c?.abertura ?? (det.regularMarketOpen != null ? Number(det.regularMarketOpen) : null);
+    const deOntem = cotacaoDeOntem(t);
+    const a = agoraSP();
+    const n = (v) => v == null || !isFinite(v) ? '—' : num(v);
+
+    // ---------- pontos ----------
+    const bra = INTRADIA[t];
+    let pts, fonte;
+    if (bra?.pts) { pts = bra.pts.slice(); fonte = 'brapi, a cada 5 min'; }
+    else {
+        pts = pontosRegistrados(t).slice();
+        fonte = 'registrado pelo portal a cada busca de cotação (o gráfico vai se formando ao longo do dia)';
+        if (abertura != null && a.diaUtil && a.minutos >= 10 * 60) {
+            const ms10 = Date.parse(`${a.data}T10:00:00-03:00`);
+            if (!pts.length || pts[0][0] > ms10) pts.unshift([ms10, abertura]);   // começa na abertura
+        }
+    }
+    if (c && !deOntem) {
+        const ult = pts[pts.length - 1];
+        if (!ult || Math.abs(ult[1] - c.preco) > 1e-9) pts.push([c.em || Date.now(), c.preco]);
+    }
+    if (deOntem) pts = [];
+
+    // ---------- resultado do dia da posição ----------
+    const D = dadosDoDia(cids);
+    const linha = D.linhas.find(l => l.t === t);
+
+    // ---------- números ----------
+    const varDia = c?.variacao != null ? c.variacao : c && anterior ? (c.preco / anterior - 1) * 100 : null;
+    const st = (rot, val, cls = '') => `<div><span>${rot}</span><strong class="${cls}">${val}</strong></div>`;
+    $('dia-ativo-numeros').innerHTML =
+        st('Fech. anterior', n(anterior)) + st('Abertura', n(abertura)) +
+        st('Mínima', n(c?.minima ?? det.regularMarketDayLow)) + st('Máxima', n(c?.maxima ?? det.regularMarketDayHigh)) +
+        st('Agora', deOntem ? '<span class="tag-ontem">ainda de ontem</span>' : n(c?.preco)) +
+        st('Variação', deOntem || varDia == null ? '—' : `${seta(varDia)}${pct(varDia)}`, deOntem ? '' : classe(varDia)) +
+        st('Var. R$ / ação', deOntem || !c || anterior == null ? '—' : sinalBrl(c.preco - anterior), deOntem ? '' : classe(c && anterior != null ? c.preco - anterior : null)) +
+        st('Resultado da posição', linha?.resultado != null ? sinalBrl(linha.resultado) : '—', classe(linha?.resultado));
+
+    // ---------- gráfico ----------
+    const rotulos = pts.map(p => horaSP(p[0]));
+    const valores = pts.map(p => +p[1].toFixed(2));
+    const sobe = valores.length ? valores[valores.length - 1] >= (anterior ?? valores[0]) : true;
+    const cor = sobe ? '#3FB97A' : '#F2737B';
+    const datasets = [{
+        label: 'Preço', data: valores, borderColor: cor, borderWidth: 2.2, tension: .25,
+        pointRadius: valores.length > 30 ? 0 : 3, pointHoverRadius: 5, pointBackgroundColor: cor,
+        fill: anterior != null ? { target: { value: anterior }, above: 'rgba(63,185,122,.14)', below: 'rgba(242,115,123,.14)' } : false
+    }];
+    if (anterior != null && valores.length) datasets.push({
+        label: 'Fechamento anterior', data: valores.map(() => anterior), borderColor: '#8B95A3', borderDash: [5, 4],
+        borderWidth: 1.2, pointRadius: 0, fill: false
+    });
+    const pmPos = linha && linha.qtd > 0 ? (() => {
+        let q = 0, k = 0;
+        for (const p of calcularPosicoes().values()) if (cids.has(p.carteira_id) && p.qtd > 0 && ativoDe(p.ativo_id)?.ticker === t) { q += p.qtd; k += p.custo; }
+        return q ? k / q : null;
+    })() : null;
+    const mostrarPM = pmPos != null && valores.length && Math.abs(pmPos / valores[valores.length - 1] - 1) < 0.08;   // só se estiver perto (senão achata o gráfico)
+    if (mostrarPM) datasets.push({ label: 'Seu preço médio', data: valores.map(() => +pmPos.toFixed(2)), borderColor: '#B58CF0', borderDash: [2, 3], borderWidth: 1.2, pointRadius: 0, fill: false });
+
+    const opcoes = opcoesLinha(v => num(v), rotulos, v => brl.format(v), false);
+    opcoes.plugins.tooltip.callbacks.label = (ctx) => {
+        if (ctx.dataset.label !== 'Preço') return ` ${ctx.dataset.label}: ${brl.format(ctx.raw)}`;
+        return ` Preço: ${brl.format(ctx.raw)}${anterior ? ` (${pct((ctx.raw / anterior - 1) * 100)})` : ''}`;
+    };
+    if (window.Chart) desenhar('g-dia-ativo', { type: 'line', data: { labels: rotulos, datasets }, options: opcoes });
+
+    $('dia-ativo-leg-pm').classList.toggle('oculto', !mostrarPM);
+    $('dia-ativo-nota').textContent = deOntem
+        ? 'O pregão de hoje ainda não chegou na brapi (atraso de ~30 min no plano gratuito).'
+        : !a.diaUtil ? 'Hoje não tem pregão.'
+        : pts.length < 2 ? `Ainda poucos pontos para o gráfico. Fonte: ${fonte}.`
+        : `${pts.length} pontos de ${rotulos[0]} a ${rotulos[rotulos.length - 1]} · fonte: ${fonte}.`;
 }
 
 function desenharDetalhe(t, det) {
