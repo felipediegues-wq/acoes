@@ -41,6 +41,9 @@ a { color: var(--sutil2); }
 .status { display: inline-flex; align-items: center; gap: 8px; color: var(--sutil2); font-size: 13px; }
 .status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--sutil); }
 .status.auto::before { background: var(--verde); }
+.status.atrasada { color: #F0D48A; }
+.status.atrasada::before { background: #E8A23A; }
+.tag-ontem { padding: 3px 8px; border-radius: 5px; background: #3A2F12; color: #F0D48A; font-size: 12px; font-weight: 600; }
 .status:empty { display: none; }
 
 /* ---------------- Botões ---------------- */

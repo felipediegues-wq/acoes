@@ -555,16 +555,49 @@ function pregaoAberto() {
 const horaSP = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 let horaCotacao = '';   // usado também no topo da Visão geral do celular
 
+// ---------- cotação "de ontem" (atraso da brapi no início do pregão) ----------
+// No plano gratuito a brapi atrasa ~30 min: logo depois das 10h ela ainda entrega
+// o fechamento e a variação do dia anterior, com horário de hoje.
+// Detecta assim: pregão aberto + preço igual ao último fechamento gravado (dia anterior)
+// + variação diferente de zero  → é o dado de ontem.
+const INICIO_CONFIAVEL_MIN = 10 * 60 + 45;   // depois das 10:45 o dado atrasado já é do pregão de hoje
+
+function fechamentoAnteriorSalvo(t) {
+    const ontem = somaDias(hojeSP(), -1);
+    for (let i = DB.fechamentos.length - 1; i >= 0; i--) {
+        const f = DB.fechamentos[i];
+        if (f.data <= ontem && f.precos?.[t] != null) return Number(f.precos[t]);
+    }
+    return null;
+}
+
+function cotacaoDeOntem(t) {
+    const c = COTACOES[t], a = agoraSP();
+    if (!c || !a.diaUtil || a.minutos < 10 * 60 || a.minutos >= FECHAMENTO_MIN) return false;
+    const ant = fechamentoAnteriorSalvo(t);
+    if (ant != null) return Math.abs(c.preco - ant) < 0.005 && Math.abs(c.variacao) > 0.005;
+    return a.minutos < INICIO_CONFIAVEL_MIN;   // sem fechamento gravado: no começo do pregão, assume que ainda é o de ontem
+}
+
 function atualizarInfoCotacao() {
     const el = $('info-cotacao');
-    const horarios = tickersEmUso().map(t => COTACOES[t]?.em).filter(Boolean);
+    const tickers = tickersEmUso();
+    const horarios = tickers.map(t => COTACOES[t]?.em).filter(Boolean);
     if (!horarios.length) { el.textContent = ''; horaCotacao = ''; return; }
     const maisAntiga = Math.min(...horarios);
     horaCotacao = horaSP(maisAntiga);
     const auto = janelaAutomatica();
-    el.classList.toggle('auto', auto);
-    el.textContent = auto ? `Cotações ${horaCotacao}` : `${horaCotacao} · fechado`;
-    el.title = auto ? `Atualização automática · próxima por volta de ${horaSP(maisAntiga + intervaloAutoMs())}` : 'Pregão fechado';
+    const deOntem = tickers.filter(cotacaoDeOntem);
+    el.classList.toggle('auto', auto && !deOntem.length);
+    el.classList.toggle('atrasada', deOntem.length > 0);
+    if (deOntem.length) {
+        el.textContent = deOntem.length === tickers.length ? 'Cotações ainda de ontem' : `${deOntem.length} cotação(ões) ainda de ontem`;
+        el.title = 'A brapi gratuita tem ~30 min de atraso: no início do pregão ela ainda mostra o fechamento e a variação de ontem. ' +
+                   `Buscado às ${horaCotacao}; tenta de novo a cada ${Math.round(intervaloAutoMs() / 60000)} min.`;
+    } else {
+        el.textContent = auto ? `Cotações ${horaCotacao}` : `${horaCotacao} · fechado`;
+        el.title = auto ? `Buscado às ${horaCotacao} (a brapi gratuita tem ~30 min de atraso) · próxima busca por volta de ${horaSP(maisAntiga + intervaloAutoMs())}` : 'Pregão fechado';
+    }
 }
 
 let autoRodando = false;
@@ -642,13 +675,15 @@ async function salvarFechamentos() {
         const d = agoraSP(c.mercado ?? c.em).data;
         const encerrado = d < agora.data || (d === agora.data && agora.minutos >= FECHAMENTO_MIN);
         if (encerrado) fechados[t] = { data: d, preco: c.preco };
+        else if (cotacaoDeOntem(t)) fechados[t] = { data: null, preco: c.preco };          // dado atrasado: o preço É o fechamento de ontem
         else if (c.anterior != null) fechados[t] = { data: null, preco: c.anterior };   // pregão aberto: vale o fechamento anterior
     }
     const datas = Object.values(fechados).map(f => f.data).filter(Boolean);
     let dataFech, soSeNaoExistir = false;
     if (datas.length) {
         dataFech = datas.sort().at(-1);
-    } else if (Object.keys(fechados).length) {
+    } else if (Object.keys(fechados).length && agora.minutos >= INICIO_CONFIAVEL_MIN) {
+        // (antes das 10:45 não grava: o dado atrasado pode estar entre ontem e hoje e o "fechamento anterior" seria o de anteontem)
         // site aberto pela 1ª vez com o pregão já rodando: grava o fechamento do dia útil anterior
         // (com o "fechamento anterior" da brapi), mas só se aquele dia ainda não tiver sido salvo
         dataFech = somaDias(agora.data, -1);
@@ -862,13 +897,15 @@ function renderVisao() {
     const res = valor - custo, resPct = custo > 0 ? res / custo * 100 : 0;
     const R = resumoPeriodo(cids);
     const rotuloDia = R.ult?.data === 'AGORA' ? 'Hoje' : 'Último fechamento';
+    const algumDeOntem = tickersEmUso().some(cotacaoDeOntem);
 
     // ---------- números do topo (computador) ----------
     $('kpis').innerHTML =
         kpi('Patrimônio', brl.format(valor), `investido ${brl.format(custo)}${parcial ? ' · cotação parcial' : ''}`) +
         kpi('Resultado em aberto', sinalBrl(res), `${seta(res)}${pct(resPct)} sobre o custo`, classe(res), classe(res)) +
-        kpi(rotuloDia, R.varDia != null ? pct(R.varDia) : '—',
-            R.varDiaRs != null ? `${seta(R.varDiaRs)}${sinalBrl(R.varDiaRs)} ${R.ult.data === 'AGORA' ? 'desde o fechamento' : 'no dia'}` : 'aguardando o 1º fechamento',
+        kpi(rotuloDia, algumDeOntem ? '—' : R.varDia != null ? pct(R.varDia) : '—',
+            algumDeOntem ? 'pregão de hoje ainda não chegou (atraso da brapi)'
+            : R.varDiaRs != null ? `${seta(R.varDiaRs)}${sinalBrl(R.varDiaRs)} ${R.ult.data === 'AGORA' ? 'desde o fechamento' : 'no dia'}` : 'aguardando o 1º fechamento',
             classe(R.varDia), classe(R.varDiaRs)) +
         kpi('Rentabilidade', R.rent != null ? pct(R.rent) : '—',
             R.inicio ? `desde ${dataBR(R.inicio === 'AGORA' ? hojeSP() : R.inicio)} · método de cotas` : 'sem fechamentos no período', classe(R.rent)) +
@@ -1516,8 +1553,10 @@ function desenharDetalhe(t, det) {
     const av = $('det-aviso');
     const msgAviso = det?.erro
         ? `Não consegui buscar ${t} na brapi (${det.erro}). ${lerLocal(CHAVE_TOKEN, '') ? 'Confira se o ticker existe.' : 'Sem token só PETR4, VALE3, MGLU3 e ITUB4 funcionam — cadastre o token em Configurações.'}`
+        : cotacaoDeOntem(t) ? `Início do pregão: a brapi gratuita tem ~30 min de atraso e ainda está mostrando o FECHAMENTO DE ONTEM (${preco != null ? num(preco) : '—'}) e a variação de ontem. O preço de hoje aparece sozinho em alguns minutos.`
         : det?.semHistorico ? 'A brapi não devolveu o histórico de preços para o seu plano; o gráfico usa só os fechamentos gravados pelo portal.' : '';
     av.textContent = msgAviso; av.classList.toggle('oculto', !msgAviso);
+    const deOntem = cotacaoDeOntem(t);
 
     // ---------- cotação ----------
     $('det-cotacao').innerHTML = `
@@ -1527,9 +1566,11 @@ function desenharDetalhe(t, det) {
         </div>
         <div class="det-preco">
             <span class="grande">${preco != null ? brl.format(preco) : '—'}</span>
-            ${varDia != null ? `<span class="var ${classe(varDia)}">${seta(varDia)}${pct(varDia)} hoje</span>` : ''}
+            ${varDia != null ? `<span class="var ${classe(varDia)}">${seta(varDia)}${pct(varDia)} ${deOntem ? 'ontem' : 'hoje'}</span>` : ''}
+            ${deOntem ? '<span class="tag-ontem">fechamento de ontem</span>' : ''}
         </div>
-        <span class="sutil">${r.regularMarketTime || cot?.mercado ? 'cotação de ' + horaSP(tempoMs(r.regularMarketTime) || cot.mercado) + ' · atraso conforme o plano da brapi' : det ? '' : 'carregando…'}</span>`;
+        <span class="sutil">${deOntem ? 'o preço de hoje ainda não chegou na brapi (atraso de ~30 min no plano gratuito)'
+            : r.regularMarketTime || cot?.mercado ? 'dado da brapi de ' + horaSP(tempoMs(r.regularMarketTime) || cot.mercado) + ' · plano gratuito com ~30 min de atraso' : det ? '' : 'carregando…'}</span>`;
 
     // ---------- dados de mercado ----------
     const min52 = r.fiftyTwoWeekLow, max52 = r.fiftyTwoWeekHigh;
