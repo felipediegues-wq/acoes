@@ -7,11 +7,11 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=14: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
-    <link rel="stylesheet" href="style.css?v=14">
+    <!-- ?v=15: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <link rel="stylesheet" href="style.css?v=15">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=14"></script>
+    <script src="config.js?v=15"></script>
 </head>
 <body>
 
@@ -85,6 +85,26 @@
             <div id="m-hero" class="m-hero so-celular"></div>
             <section id="kpis" class="kpis so-desktop" aria-label="Resumo"></section>
 
+            <section class="painel sem-padding so-desktop dia-visao">
+                <div class="painel-topo com-padding"><h2>Hoje</h2><span id="dia-info-v" class="sutil"></span></div>
+                <div class="tabela-wrap">
+                    <table class="dados tabela-dia">
+                        <thead><tr>
+                            <th>Ativo</th><th class="num">Quant.</th><th class="num">Fech. anterior</th><th class="num">Abertura</th>
+                            <th class="num">Mínima</th><th class="num">Máxima</th><th class="col-faixa">Faixa do dia</th>
+                            <th class="num">Cotação</th><th class="num">Var. %</th><th class="num">Var. R$</th><th class="num">Resultado do dia</th>
+                        </tr></thead>
+                        <tbody id="tb-dia-v"></tbody>
+                        <tfoot id="tf-dia-v"></tfoot>
+                    </table>
+                </div>
+            </section>
+            <section id="m-dia-bloco-v" class="m-bloco so-celular">
+                <span class="m-titulo">Hoje</span>
+                <div id="m-dia-v" class="painel" style="padding:4px 14px"></div>
+            </section>
+
+
             <section id="painel-mercado" class="painel mercado">
                 <div class="painel-topo">
                     <h2>Mercado hoje</h2>
@@ -156,6 +176,25 @@
         <!-- ================= EVOLUÇÃO ================= -->
         <section id="aba-evolucao" class="aba-conteudo">
             <section id="resumo-evolucao" class="kpis" aria-label="Resumo do período"></section>
+
+            <section class="painel sem-padding so-desktop">
+                <div class="painel-topo com-padding"><h2>Hoje</h2><span id="dia-info" class="sutil"></span></div>
+                <div class="tabela-wrap">
+                    <table class="dados tabela-dia">
+                        <thead><tr>
+                            <th>Ativo</th><th class="num">Quant.</th><th class="num">Fech. anterior</th><th class="num">Abertura</th>
+                            <th class="num">Mínima</th><th class="num">Máxima</th><th class="col-faixa">Faixa do dia</th>
+                            <th class="num">Cotação</th><th class="num">Var. %</th><th class="num">Var. R$</th><th class="num">Resultado do dia</th>
+                        </tr></thead>
+                        <tbody id="tb-dia"></tbody>
+                        <tfoot id="tf-dia"></tfoot>
+                    </table>
+                </div>
+            </section>
+            <section class="m-bloco so-celular">
+                <span class="m-titulo">Hoje</span>
+                <div id="m-dia" class="painel" style="padding:4px 14px"></div>
+            </section>
 
             <!-- celular: um cartão por ativo (sem rolar para o lado) -->
             <section class="m-bloco so-celular">
@@ -529,6 +568,6 @@
     </div>
 </div>
 
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

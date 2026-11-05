@@ -295,6 +295,10 @@ async function buscarCotacao(ticker) {
         preco: Number(r.regularMarketPrice),
         variacao: Number(r.regularMarketChangePercent || 0),
         anterior: r.regularMarketPreviousClose != null ? Number(r.regularMarketPreviousClose) : null,
+        abertura: r.regularMarketOpen != null ? Number(r.regularMarketOpen) : null,
+        maxima: r.regularMarketDayHigh != null ? Number(r.regularMarketDayHigh) : null,
+        minima: r.regularMarketDayLow != null ? Number(r.regularMarketDayLow) : null,
+        volume: r.regularMarketVolume != null ? Number(r.regularMarketVolume) : null,
         mercado: tempoMs(r.regularMarketTime),   // horário da cotação na B3
         em: Date.now()                           // horário em que buscamos
     };
@@ -882,6 +886,56 @@ const valorDe = (p) => {
 };
 
 // ====================================================================
+// DADOS DO DIA (a partir do fechamento anterior informado pela brapi)
+//  resultado = (qtd de ontem − vendido hoje) × (preço − fech. anterior)
+//            + vendido hoje × (preço de venda − fech. anterior)
+//            + comprado hoje × (preço − preço de compra)
+// ====================================================================
+function dadosDoDia(cids) {
+    const hoje = hojeSP(), ontem = somaDias(hoje, -1);
+    const qOntem = new Map();
+    for (const p of calcularPosicoes(ontem).values()) {
+        if (cids.has(p.carteira_id) && p.qtd > 0) qOntem.set(p.ativo_id, (qOntem.get(p.ativo_id) || 0) + p.qtd);
+    }
+    const qAgora = new Map();
+    for (const p of calcularPosicoes().values()) {
+        if (cids.has(p.carteira_id) && p.qtd > 0) qAgora.set(p.ativo_id, (qAgora.get(p.ativo_id) || 0) + p.qtd);
+    }
+    const ids = new Set([...qOntem.keys(), ...qAgora.keys()]);
+    const ordensHoje = DB.ordens.filter(o => o.data_ordem === hoje && cids.has(o.carteira_id));
+    const linhas = [];
+    let total = 0, base = 0, semDado = 0, deOntem = 0;
+    for (const id of ids) {
+        const a = ativoDe(id), t = normTicker(a?.ticker), c = COTACOES[t];
+        const q0 = qOntem.get(id) || 0, q1 = qAgora.get(id) || 0;
+        const compras = ordensHoje.filter(o => o.ativo_id === id && o.tipo === 'C');
+        const vendas = ordensHoje.filter(o => o.ativo_id === id && o.tipo === 'V');
+        const linha = { a, t, c, qtd: q1, qtdOntem: q0, resultado: null, pct: null, operou: compras.length + vendas.length > 0 };
+        if (!c || c.anterior == null) { semDado++; linhas.push(linha); continue; }
+        if (cotacaoDeOntem(t)) { deOntem++; linha.deOntem = true; linhas.push(linha); continue; }
+        const vend = vendas.reduce((s, o) => s + Number(o.quantidade), 0);
+        let r = Math.max(0, q0 - vend) * (c.preco - c.anterior);
+        for (const o of vendas) r += Number(o.quantidade) * (Number(o.preco) - c.anterior) - Number(o.taxas || 0);
+        for (const o of compras) r += Number(o.quantidade) * (c.preco - Number(o.preco)) - Number(o.taxas || 0);
+        const b = q0 * c.anterior + compras.reduce((s, o) => s + Number(o.quantidade) * Number(o.preco), 0);
+        linha.resultado = r; linha.pct = b > 0 ? r / b * 100 : null;
+        total += r; base += b;
+        linhas.push(linha);
+    }
+    linhas.sort((x, y) => (y.qtd * (y.c?.preco || 0)) - (x.qtd * (x.c?.preco || 0)));
+    return { linhas, total, pct: base > 0 ? total / base * 100 : null, semDado, deOntem,
+             altas: linhas.filter(l => l.resultado > 0).length, baixas: linhas.filter(l => l.resultado < 0).length };
+}
+
+function kpiHoje(D) {
+    if (!D.linhas.length) return kpi('Hoje', '—', 'sem posições');
+    if (D.deOntem && D.deOntem + D.semDado >= D.linhas.length) return kpi('Hoje', '—', 'pregão de hoje ainda não chegou (atraso da brapi)');
+    const extra = D.deOntem ? ` · ${D.deOntem} ainda de ontem` : D.semDado ? ` · ${D.semDado} sem cotação` : '';
+    return kpi('Hoje', D.pct != null ? pct(D.pct) : '—', `${seta(D.total)}${sinalBrl(D.total)} · ${D.altas}▲ ${D.baixas}▼${extra}`,
+               classe(D.total), classe(D.total));
+}
+
+// ====================================================================
 // TELA: VISÃO GERAL
 // ====================================================================
 function renderVisao() {
@@ -897,16 +951,14 @@ function renderVisao() {
     const res = valor - custo, resPct = custo > 0 ? res / custo * 100 : 0;
     const R = resumoPeriodo(cids);
     const rotuloDia = R.ult?.data === 'AGORA' ? 'Hoje' : 'Último fechamento';
-    const algumDeOntem = tickersEmUso().some(cotacaoDeOntem);
+    const DIA = dadosDoDia(cids);
+    renderQuadroDia(DIA, '-v');
 
     // ---------- números do topo (computador) ----------
     $('kpis').innerHTML =
         kpi('Patrimônio', brl.format(valor), `investido ${brl.format(custo)}${parcial ? ' · cotação parcial' : ''}`) +
         kpi('Resultado em aberto', sinalBrl(res), `${seta(res)}${pct(resPct)} sobre o custo`, classe(res), classe(res)) +
-        kpi(rotuloDia, algumDeOntem ? '—' : R.varDia != null ? pct(R.varDia) : '—',
-            algumDeOntem ? 'pregão de hoje ainda não chegou (atraso da brapi)'
-            : R.varDiaRs != null ? `${seta(R.varDiaRs)}${sinalBrl(R.varDiaRs)} ${R.ult.data === 'AGORA' ? 'desde o fechamento' : 'no dia'}` : 'aguardando o 1º fechamento',
-            classe(R.varDia), classe(R.varDiaRs)) +
+        kpiHoje(DIA) +
         kpi('Rentabilidade', R.rent != null ? pct(R.rent) : '—',
             R.inicio ? `desde ${dataBR(R.inicio === 'AGORA' ? hojeSP() : R.inicio)} · método de cotas` : 'sem fechamentos no período', classe(R.rent)) +
         kpi(periodoDias ? 'Proventos no período' : 'Proventos', brl.format(periodoDias ? R.provPeriodo : prov),
@@ -918,7 +970,7 @@ function renderVisao() {
         <span class="grande">${brl.format(valor)}</span>
         <div class="chips">
             <span class="chip ${classe(res)}">${seta(res)}${sinalBrl(res)} (${pct(resPct)})</span>
-            ${R.varDia != null ? `<span class="chip ${classe(R.varDia)}">${seta(R.varDia)}${rotuloDia.toLowerCase()} ${pct(R.varDia)}</span>` : ''}
+            ${DIA.pct != null && !(DIA.deOntem && DIA.deOntem + DIA.semDado >= DIA.linhas.length) ? `<span class="chip ${classe(DIA.total)}">${seta(DIA.total)}hoje ${pct(DIA.pct)}</span>` : ''}
             ${R.rent != null ? `<span class="chip">rent. ${pct(R.rent)}</span>` : ''}
             ${COTACOES[IBOV] ? `<span class="chip">IBOV ${num(COTACOES[IBOV].preco, 0)} <span class="${classe(COTACOES[IBOV].variacao)}">${pct(COTACOES[IBOV].variacao)}</span></span>` : ''}
         </div>`;
@@ -1059,13 +1111,14 @@ function renderEvolucao() {
     const base = montarBase(cids);
     const R = resumoPeriodo(cids, base);
     const ult = R.ult;
+    const DIA = dadosDoDia(cids);
+    renderQuadroDia(DIA);
 
     $('resumo-evolucao').innerHTML = !ult
         ? kpi('Sem dados', '—', 'Os fechamentos são gravados automaticamente a cada dia de pregão.')
         : kpi('Patrimônio', brl.format(ult.V), `investido ${brl.format(ult.I)}`) +
           kpi('Resultado em aberto', sinalBrl(ult.V - ult.I), ult.I > 0 ? `${seta(ult.V - ult.I)}${pct((ult.V / ult.I - 1) * 100)} sobre o custo` : '', classe(ult.V - ult.I), classe(ult.V - ult.I)) +
-          kpi(ult.data === 'AGORA' ? 'Hoje' : 'Último fechamento', R.varDia != null ? pct(R.varDia) : '—',
-              R.varDiaRs != null ? `${seta(R.varDiaRs)}${sinalBrl(R.varDiaRs)}` : '', classe(R.varDia), classe(R.varDiaRs)) +
+          kpiHoje(DIA) +
           kpi('Rentabilidade no período', R.rent != null ? pct(R.rent) : '—',
               R.inicio ? `desde ${dataBR(R.inicio === 'AGORA' ? hojeSP() : R.inicio)}` : '', classe(R.rent)) +
           kpi('Proventos no período', brl.format(R.provPeriodo), `${R.vis.length} fechamento(s) no período`);
@@ -1144,6 +1197,53 @@ function renderEvolucao() {
             scales: { x: { grid: { display: false } }, y: { ticks: { callback: brlCurto } } }
         }
     });
+}
+
+// ---------- quadro "Hoje" da Evolução ----------
+function faixaDia(c) {
+    // barra mínima–máxima do dia com a abertura (traço) e a cotação atual (ponto)
+    if (!c || c.minima == null || c.maxima == null || c.maxima <= c.minima) return '';
+    const p = (v) => Math.max(0, Math.min(100, (v - c.minima) / (c.maxima - c.minima) * 100)).toFixed(1);
+    return `<span class="faixa-dia" title="mín ${num(c.minima)} · máx ${num(c.maxima)}${c.abertura != null ? ' · abertura ' + num(c.abertura) : ''}">
+        ${c.abertura != null ? `<b style="left:${p(c.abertura)}%"></b>` : ''}<i class="${classe(c.preco - (c.anterior ?? c.preco))}" style="left:${p(c.preco)}%"></i></span>`;
+}
+
+function renderQuadroDia(D, suf = '') {
+    const $$ = (id) => $(id + suf);
+    const n = (v) => v == null ? '—' : num(v);
+    const sinalN = (v) => v == null ? '—' : (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + num(Math.abs(v));
+    const cel = (l) => {
+        if (l.deOntem) return '<span class="tag-ontem">ainda de ontem</span>';
+        return l.c?.variacao != null ? `${seta(l.c.variacao)}${pct(l.c.variacao)}` : '—';
+    };
+    $$('tb-dia').innerHTML = D.linhas.map(l => `<tr>
+        <td><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(l.t)}">${esc(l.t)}</a></strong>${l.operou ? ' <span class="tag-operou" title="Teve compra ou venda hoje">operou hoje</span>' : ''}</td>
+        <td class="num">${qtdFmt(l.qtd)}</td>
+        <td class="num">${n(l.c?.anterior)}</td>
+        <td class="num">${n(l.c?.abertura)}</td>
+        <td class="num">${n(l.c?.minima)}</td>
+        <td class="num">${n(l.c?.maxima)}</td>
+        <td>${faixaDia(l.c)}</td>
+        <td class="num">${n(l.c?.preco)}</td>
+        <td class="num ${l.deOntem ? '' : classe(l.c?.variacao)}">${cel(l)}</td>
+        <td class="num ${l.deOntem ? '' : classe(l.c && l.c.anterior != null ? l.c.preco - l.c.anterior : null)}">${l.deOntem || !l.c || l.c.anterior == null ? '—' : sinalN(l.c.preco - l.c.anterior)}</td>
+        <td class="num ${classe(l.resultado)}">${l.resultado != null ? sinalBrl(l.resultado) : '—'}</td>
+    </tr>`).join('') || '<tr><td colspan="11" class="vazio">Nenhuma posição nas carteiras selecionadas.</td></tr>';
+    $$('tf-dia').innerHTML = D.linhas.length ? `<tr>
+        <td colspan="10">Resultado do dia${D.pct != null ? ` <span class="sutil">(${pct(D.pct)} sobre o valor de ontem)</span>` : ''}</td>
+        <td class="num ${classe(D.total)}">${sinalBrl(D.total)}</td></tr>` : '';
+
+    $$('m-dia').innerHTML = D.linhas.map(l => `
+        <div class="m-linha">
+            <span><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(l.t)}">${esc(l.t)}</a></strong>
+                <small class="sutil m-dia-det">${l.c ? `ant. ${n(l.c.anterior)} → ${n(l.c.preco)}` : 'sem cotação'}</small></span>
+            <span class="dir"><span class="${l.deOntem ? '' : classe(l.c?.variacao)}">${cel(l)}</span>
+                <small class="${classe(l.resultado)}">${l.resultado != null ? sinalBrl(l.resultado) : ''}</small></span>
+        </div>`).join('') +
+        (D.linhas.length ? `<div class="m-linha m-dia-total"><strong>Resultado do dia</strong><span class="dir ${classe(D.total)}">${sinalBrl(D.total)}${D.pct != null ? ' · ' + pct(D.pct) : ''}</span></div>` : '');
+
+    const c0 = D.linhas.map(l => l.c?.mercado || l.c?.em).filter(Boolean);
+    $$('dia-info').textContent = c0.length ? `cotações buscadas às ${horaSP(Math.min(...D.linhas.map(l => l.c?.em).filter(Boolean)))} · atraso de ~30 min (brapi gratuita)` : '';
 }
 
 // ====================================================================
