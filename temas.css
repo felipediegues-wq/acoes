@@ -1,0 +1,147 @@
+/* ====================================================================
+   temas.css — temas de cor do Portal de Ações
+   O tema escolhido fica em <html data-tema="...">. "noturno" é o padrão
+   (cores do :root no style.css). Para criar um tema novo: copie um bloco,
+   troque o nome e ajuste as cores, e acrescente-o na lista TEMAS do app.js.
+   ==================================================================== */
+
+/* ---------- DIA: claro, limpo, azul e verde-esmeralda ---------- */
+html[data-tema="dia"] {
+    color-scheme: light;
+    --bg: #F3F5F9; --topo: #FFFFFF; --painel: #FFFFFF; --painel2: #EEF2F7; --ativo: #E3E9F2; --ativo-hover: #D7DFEB;
+    --hover: #F5F7FB; --hover-sel: #E8EFFF;
+    --borda: #E1E6EE; --linha: #EDF0F5; --campo: #FFFFFF; --borda-campo: #C9D1DD; --borda-forte: #A9B3C2;
+    --texto: #131A2A; --sutil: #5B6476; --sutil2: #3F4858; --forte: #0B1020;
+    --verde: #12804A; --verde-hover: #0E6C3E; --btn-txt: #FFFFFF; --verde-txt: #0F7A44; --vermelho: #C8323C;
+    --azul: #2F5BEA; --amarelo: #B86E00; --roxo: #7A4FD0;
+    --alta: #12A15A; --baixa: #D63B45;
+    --alta-chip: #E1F5E9; --alta-chip-txt: #0F6B3D; --baixa-chip: #FDE6E8; --baixa-chip-txt: #A3262E;
+    --azul-chip: #E8EEFF; --azul-chip-txt: #1D45C8;
+    --aviso-fundo: #FFF6DB; --aviso-borda: #EBCB7A; --aviso-txt: #6B4B00;
+    --foco: rgba(47,91,234,.22); --sombra: rgba(18,24,38,.14); --logo-fundo: #E1F5E9;
+    --s1: #2F5BEA; --s2: #12A15A; --s3: #D97706; --s4: #7A4FD0; --s5: #D63B45;
+    --s6: #0891B2; --s7: #65A30D; --s8: #9A6B4F; --s9: #DB2777; --s10: #64748B;
+}
+
+/* ---------- TERMINAL: preto e âmbar, tudo monoespaçado (estilo mesa de operações) ---------- */
+html[data-tema="terminal"] {
+    --bg: #000000; --topo: #070707; --painel: #0A0A0A; --painel2: #161208; --ativo: #2A2108; --ativo-hover: #3A2D0A;
+    --hover: #120F06; --hover-sel: #1E1806;
+    --borda: #2A2410; --linha: #19160B; --campo: #000000; --borda-campo: #4A3D12; --borda-forte: #6B5614;
+    --texto: #FFB000; --sutil: #A87A12; --sutil2: #D99A1A; --forte: #FFD47A;
+    --verde: #FFB000; --verde-hover: #FFC233; --btn-txt: #000000; --verde-txt: #00E676; --vermelho: #FF3D3D;
+    --azul: #FFB000; --amarelo: #FFEA00; --roxo: #E040FB;
+    --alta: #00E676; --baixa: #FF3D3D;
+    --alta-chip: #002B14; --alta-chip-txt: #00E676; --baixa-chip: #2B0606; --baixa-chip-txt: #FF6B6B;
+    --azul-chip: #2A2108; --azul-chip-txt: #FFD47A;
+    --aviso-fundo: #2A2108; --aviso-borda: #6B5614; --aviso-txt: #FFD47A;
+    --foco: rgba(255,176,0,.3); --sombra: rgba(0,0,0,.8); --logo-fundo: #2A2108;
+    --sans: var(--mono);
+    --s1: #FFB000; --s2: #00E676; --s3: #4FC3F7; --s4: #E040FB; --s5: #FF3D3D;
+    --s6: #FFEA00; --s7: #00BFA5; --s8: #FF6E40; --s9: #B2FF59; --s10: #9E9E9E;
+}
+
+/* ---------- OCEANO: azul profundo com turquesa ---------- */
+html[data-tema="oceano"] {
+    --bg: #061521; --topo: #081B2A; --painel: #0B2233; --painel2: #0F2C42; --ativo: #143A57; --ativo-hover: #1A4768;
+    --hover: #0E283C; --hover-sel: #10344F;
+    --borda: #173650; --linha: #112C42; --campo: #051220; --borda-campo: #21496A; --borda-forte: #2F6189;
+    --texto: #E2F3FB; --sutil: #7DA2BA; --sutil2: #A9C8DA; --forte: #FFFFFF;
+    --verde: #17C3B2; --verde-hover: #2BD8C6; --btn-txt: #032421; --verde-txt: #3FE0C5; --vermelho: #FF7A8A;
+    --azul: #5CC8FF; --amarelo: #FFC15E; --roxo: #A78BFA;
+    --alta: #2DD4BF; --baixa: #FF7A8A;
+    --alta-chip: #0C3A3A; --alta-chip-txt: #5FF0D6; --baixa-chip: #3A1826; --baixa-chip-txt: #FF9DAA;
+    --azul-chip: #0E3150; --azul-chip-txt: #8FD8FF;
+    --aviso-fundo: #2F2810; --aviso-borda: #6B5520; --aviso-txt: #FFD98A;
+    --foco: rgba(92,200,255,.28); --logo-fundo: #0C3A3A;
+    --fundo-pagina: radial-gradient(1200px 600px at 85% -10%, #0E3A55 0%, transparent 60%), #061521;
+    --s1: #5CC8FF; --s2: #2DD4BF; --s3: #FFC15E; --s4: #A78BFA; --s5: #FF7A8A;
+    --s6: #38BDF8; --s7: #A3E635; --s8: #F59E0B; --s9: #F472B6; --s10: #94A3B8;
+}
+
+/* ---------- CANAVIAL: verde-oliva escuro com dourado de açúcar ---------- */
+html[data-tema="canavial"] {
+    --bg: #0E110A; --topo: #13170E; --painel: #181D12; --painel2: #202718; --ativo: #2B341F; --ativo-hover: #364228;
+    --hover: #1D2316; --hover-sel: #262E1A;
+    --borda: #2A3320; --linha: #1F2618; --campo: #0B0E08; --borda-campo: #3B4730; --borda-forte: #56663F;
+    --texto: #EEE9D4; --sutil: #9C9B7C; --sutil2: #C4C0A0; --forte: #FFF8E1;
+    --verde: #D9A72B; --verde-hover: #E8B842; --btn-txt: #1A1405; --verde-txt: #9FD46A; --vermelho: #E8765A;
+    --azul: #E0B341; --amarelo: #F2C94C; --roxo: #B39DDB;
+    --alta: #8CC152; --baixa: #E8765A;
+    --alta-chip: #24331A; --alta-chip-txt: #B5E08A; --baixa-chip: #3A1F16; --baixa-chip-txt: #F59A80;
+    --azul-chip: #3A3014; --azul-chip-txt: #F2D27A;
+    --aviso-fundo: #3A3014; --aviso-borda: #6B5A20; --aviso-txt: #F2D27A;
+    --foco: rgba(224,179,65,.28); --logo-fundo: #2B341F;
+    --s1: #E0B341; --s2: #8CC152; --s3: #E8765A; --s4: #C5E1A5; --s5: #A1887F;
+    --s6: #4DB6AC; --s7: #FFD54F; --s8: #CE93D8; --s9: #FF8A65; --s10: #90A4AE;
+}
+
+/* ---------- NEON: synthwave roxo, rosa e ciano ---------- */
+html[data-tema="neon"] {
+    --bg: #0D0221; --topo: #110330; --painel: #160737; --painel2: #1F0C4A; --ativo: #2B1263; --ativo-hover: #381879;
+    --hover: #1B0942; --hover-sel: #241056;
+    --borda: #2C1458; --linha: #1E0B42; --campo: #0A0119; --borda-campo: #46238A; --borda-forte: #6A3BC2;
+    --texto: #F3EAFF; --sutil: #9D89CC; --sutil2: #C9B8F0; --forte: #FFFFFF;
+    --verde: #FF2E97; --verde-hover: #FF52AA; --btn-txt: #FFFFFF; --verde-txt: #2BFFB8; --vermelho: #FF4D6D;
+    --azul: #00E5FF; --amarelo: #FFD600; --roxo: #B967FF;
+    --alta: #2BFFB8; --baixa: #FF4D6D;
+    --alta-chip: #0C3A3A; --alta-chip-txt: #6FFFD2; --baixa-chip: #3D0C2A; --baixa-chip-txt: #FF8FA8;
+    --azul-chip: #0B2F4A; --azul-chip-txt: #7DF3FF;
+    --aviso-fundo: #3A2A00; --aviso-borda: #7A5A00; --aviso-txt: #FFE36E;
+    --foco: rgba(0,229,255,.3); --sombra: rgba(0,0,0,.6); --logo-fundo: #2B1263;
+    --fundo-pagina: radial-gradient(900px 500px at 10% -10%, #3B0B6B 0%, transparent 60%),
+                    radial-gradient(900px 500px at 100% 0%, #5A0B4F 0%, transparent 55%), #0D0221;
+    --s1: #00E5FF; --s2: #FF2E97; --s3: #FFD600; --s4: #B967FF; --s5: #2BFFB8;
+    --s6: #FF8A00; --s7: #7C4DFF; --s8: #FF4D6D; --s9: #00B8D4; --s10: #E1BEE7;
+}
+html[data-tema="neon"] .btn:not(.btn-sec), html[data-tema="neon"] .nav-centro button { box-shadow: 0 0 18px rgba(255,46,151,.45); }
+html[data-tema="neon"] .lucro { text-shadow: 0 0 8px rgba(43,255,184,.35); }
+html[data-tema="neon"] .prejuizo { text-shadow: 0 0 8px rgba(255,77,109,.35); }
+
+/* ---------- ALTO CONTRASTE: máxima legibilidade (sol forte, vista cansada) ---------- */
+html[data-tema="contraste"] {
+    --bg: #000000; --topo: #000000; --painel: #000000; --painel2: #1A1A1A; --ativo: #333333; --ativo-hover: #444444;
+    --hover: #111111; --hover-sel: #1F1F1F;
+    --borda: #8A8A8A; --linha: #4A4A4A; --campo: #000000; --borda-campo: #BBBBBB; --borda-forte: #FFFFFF;
+    --texto: #FFFFFF; --sutil: #D0D0D0; --sutil2: #EDEDED; --forte: #FFFFFF;
+    --verde: #00FF66; --verde-hover: #66FF99; --btn-txt: #000000; --verde-txt: #00FF66; --vermelho: #FF5555;
+    --azul: #4DB8FF; --amarelo: #FFE600; --roxo: #D9A6FF;
+    --alta: #00FF66; --baixa: #FF5555;
+    --alta-chip: #003314; --alta-chip-txt: #00FF66; --baixa-chip: #3A0000; --baixa-chip-txt: #FF7777;
+    --azul-chip: #002A4A; --azul-chip-txt: #7FD0FF;
+    --aviso-fundo: #332E00; --aviso-borda: #FFE600; --aviso-txt: #FFE600;
+    --foco: rgba(255,230,0,.45); --logo-fundo: #003314;
+    --s1: #4DB8FF; --s2: #00FF66; --s3: #FFE600; --s4: #D9A6FF; --s5: #FF5555;
+    --s6: #00FFFF; --s7: #FF9900; --s8: #FF66CC; --s9: #B3FF00; --s10: #FFFFFF;
+}
+html[data-tema="contraste"] body { font-size: 15px; }
+
+/* ---------- transição suave ao trocar de tema ---------- */
+html.trocando-tema, html.trocando-tema * { transition: background-color .35s ease, color .35s ease, border-color .35s ease !important; }
+
+/* ---------- seletor de temas ---------- */
+.temas-grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.tema-card { display: flex; flex-direction: column; gap: 10px; padding: 10px; border: 2px solid var(--borda); border-radius: 12px; background: var(--painel); color: var(--texto); font: inherit; text-align: left; cursor: pointer; }
+.tema-card:hover { border-color: var(--borda-forte); }
+.tema-card[aria-pressed="true"] { border-color: var(--azul); box-shadow: 0 0 0 3px var(--foco); }
+.tema-mini { position: relative; height: 92px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(127,127,127,.25); }
+.tema-mini .mb { position: absolute; left: 0; right: 0; top: 0; height: 16px; }
+.tema-mini .mb i { position: absolute; top: 5px; width: 18px; height: 6px; border-radius: 3px; }
+.tema-mini .mp { position: absolute; left: 8px; right: 8px; top: 24px; bottom: 8px; border-radius: 6px; }
+.tema-mini svg { position: absolute; left: 14px; right: 14px; top: 34px; width: calc(100% - 28px); height: 40px; }
+.tema-mini .mc { position: absolute; right: 14px; top: 29px; padding: 1px 5px; border-radius: 4px; font: 600 9px/1.4 var(--mono); }
+.tema-nome { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 600; }
+.tema-nome small { color: var(--sutil); font-weight: 400; font-size: 12px; }
+.tema-check { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--borda-forte); flex: none; }
+.tema-card[aria-pressed="true"] .tema-check { border-color: var(--azul); background: radial-gradient(circle, var(--azul) 45%, transparent 50%); }
+
+/* janela rápida (botão de paleta no topo) */
+.tema-pop { position: fixed; top: 64px; right: 24px; z-index: 60; width: min(660px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto;
+            background: var(--topo); border: 1px solid var(--borda-forte); border-radius: 14px; padding: 16px; box-shadow: 0 18px 40px var(--sombra); }
+.tema-pop .painel-topo { margin-bottom: 12px; }
+@media (max-width: 760px) {
+    .tema-pop { top: auto; bottom: 0; right: 0; left: 0; width: 100%; max-height: 80vh; border-radius: 16px 16px 0 0; padding: 14px 14px calc(20px + env(safe-area-inset-bottom)); }
+    .temas-grade { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .tema-mini { height: 74px; }
+    .tema-mini svg { top: 30px; height: 30px; }
+}

@@ -88,7 +88,134 @@ let periodoDias = 0;       // 0 = tudo
 let agruparAloc = 'ativo';
 
 // cores fixas por posição na lista (gráficos e alocação)
-const CORES = ['#5B9DFF', '#3FB97A', '#E8A23A', '#B58CF0', '#F2737B', '#4FC3D9', '#C9D46A', '#C49A85', '#EC7FB4', '#90A4AE'];
+let CORES = ['#5B9DFF', '#3FB97A', '#E8A23A', '#B58CF0', '#F2737B', '#4FC3D9', '#C9D46A', '#C49A85', '#EC7FB4', '#90A4AE'];
+
+// ====================================================================
+// TEMAS DE COR
+//  As cores ficam em variáveis CSS (style.css / temas.css). Os gráficos leem
+//  as mesmas variáveis por aqui (TC), então tudo muda junto.
+// ====================================================================
+const TEMAS = [
+    { id: 'noturno',   nome: 'Noturno',       desc: 'escuro, o clássico' },
+    { id: 'dia',       nome: 'Dia',           desc: 'claro e limpo' },
+    { id: 'terminal',  nome: 'Terminal',      desc: 'âmbar, mesa de operações' },
+    { id: 'oceano',    nome: 'Oceano',        desc: 'azul profundo e turquesa' },
+    { id: 'canavial',  nome: 'Canavial',      desc: 'oliva e dourado' },
+    { id: 'neon',      nome: 'Neon',          desc: 'synthwave anos 80' },
+    { id: 'contraste', nome: 'Alto contraste', desc: 'máxima legibilidade' },
+    { id: 'diaenoite', nome: 'Dia & Noite',   desc: 'claro das 6h às 18h', auto: true },
+    { id: 'auto',      nome: 'Automático',    desc: 'segue o aparelho', auto: true }
+];
+const CHAVE_TEMA = 'tema_v1';
+const TC = {};
+
+function hexParaRgba(cor, alfa) {
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(cor).trim());
+    return m ? `rgba(${parseInt(m[1], 16)},${parseInt(m[2], 16)},${parseInt(m[3], 16)},${alfa})` : cor;
+}
+
+function temaEfetivo(escolha) {
+    if (escolha === 'auto') return window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches ? 'dia' : 'noturno';
+    if (escolha === 'diaenoite') { const m = agoraSP().minutos; return m >= 6 * 60 && m < 18 * 60 ? 'dia' : 'noturno'; }
+    return TEMAS.some(t => t.id === escolha && !t.auto) ? escolha : 'noturno';
+}
+
+function lerCoresDoTema() {
+    const s = getComputedStyle(document.documentElement);
+    const v = (n) => s.getPropertyValue('--' + n).trim();
+    Object.assign(TC, {
+        fundo: v('bg'), topo: v('topo'), painel: v('painel'), texto: v('texto'), sutil: v('sutil'), sutil2: v('sutil2'),
+        linha: v('linha'), borda: v('borda'), bordaForte: v('borda-forte'), azul: v('azul'), amarelo: v('amarelo'), roxo: v('roxo'),
+        alta: v('alta'), baixa: v('baixa'), verdeTxt: v('verde-txt'), mono: v('mono'), sans: v('sans')
+    });
+    TC.azulA = hexParaRgba(TC.azul, .12); TC.altaA = hexParaRgba(TC.alta, .14); TC.baixaA = hexParaRgba(TC.baixa, .14);
+    CORES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(i => v('s' + i) || CORES[i - 1]);
+    if (window.Chart) {
+        Chart.defaults.color = TC.sutil;
+        Chart.defaults.borderColor = TC.linha;
+        Chart.defaults.font.family = TC.sans || "'IBM Plex Sans', system-ui, sans-serif";
+    }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', TC.topo || '#0E1116');
+}
+
+function aplicarTema(escolha, animar = false) {
+    const efetivo = temaEfetivo(escolha);
+    const html = document.documentElement;
+    if (animar) { html.classList.add('trocando-tema'); setTimeout(() => html.classList.remove('trocando-tema'), 450); }
+    html.setAttribute('data-tema', efetivo);
+    lerCoresDoTema();
+}
+
+function escolherTema(escolha) {
+    gravarLocal(CHAVE_TEMA, escolha);
+    aplicarTema(escolha, true);
+    desenharSeletorTemas();
+    // redesenha tudo que tem cor calculada no JS (gráficos, barras, minigráficos)
+    try { if (!$('tela-app').classList.contains('oculto')) { renderTudo(); renderMercado(); } } catch (e) { console.warn(e); }
+}
+
+// miniatura de cada tema, desenhada com as cores DELE (lidas aplicando o tema num elemento invisível)
+function amostraTema(id) {
+    const sonda = document.createElement('div');
+    sonda.setAttribute('aria-hidden', 'true');
+    sonda.style.cssText = 'position:absolute;visibility:hidden;pointer-events:none';
+    const casca = document.createElement('html');   // as variáveis de cada tema estão em html[data-tema]
+    casca.setAttribute('data-tema', id);
+    casca.appendChild(sonda);
+    document.body.appendChild(casca);
+    const s = getComputedStyle(casca);
+    const c = (n) => s.getPropertyValue('--' + n).trim();
+    const r = { bg: c('bg'), topo: c('topo'), painel: c('painel'), borda: c('borda'), azul: c('azul'), verde: c('verde'),
+                alta: c('alta'), baixa: c('baixa'), texto: c('texto'), altaChip: c('alta-chip'), altaChipTxt: c('alta-chip-txt'), fundoPagina: c('fundo-pagina') };
+    casca.remove();
+    return r;
+}
+
+function desenharSeletorTemas() {
+    const escolha = lerLocal(CHAVE_TEMA, 'noturno');
+    const html = TEMAS.map(t => {
+        const dupla = t.auto ? [amostraTema('dia'), amostraTema('noturno')] : [amostraTema(t.id)];
+        const mini = (k) => `
+            <div class="mb" style="background:${k.topo}"><i style="left:8px;background:${k.verde}"></i><i style="left:30px;width:12px;background:${k.texto};opacity:.35"></i></div>
+            <div class="mp" style="background:${k.painel};border:1px solid ${k.borda}"></div>
+            <span class="mc" style="background:${k.altaChip};color:${k.altaChipTxt}">+2,4%</span>
+            <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+                <polyline points="0,32 14,26 28,29 42,18 56,22 70,12 84,15 100,6" fill="none" stroke="${k.azul}" stroke-width="2.4" stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline>
+                <polyline points="0,36 20,34 40,37 60,30 80,33 100,28" fill="none" stroke="${k.baixa}" stroke-width="1.6" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"></polyline>
+            </svg>`;
+        const fundo = (k) => k.fundoPagina && k.fundoPagina !== 'var(--bg)' ? k.fundoPagina : k.bg;
+        const preview = dupla.length === 2
+            ? `<div class="tema-mini" style="background:linear-gradient(90deg, ${dupla[0].bg} 50%, ${dupla[1].bg} 50%)">
+                   <div style="position:absolute;inset:0;clip-path:inset(0 50% 0 0)">${mini(dupla[0])}</div>
+                   <div style="position:absolute;inset:0;clip-path:inset(0 0 0 50%)">${mini(dupla[1])}</div></div>`
+            : `<div class="tema-mini" style="background:${fundo(dupla[0])}">${mini(dupla[0])}</div>`;
+        return `<button type="button" class="tema-card" data-tema-escolha="${t.id}" aria-pressed="${t.id === escolha}">
+            ${preview}
+            <span class="tema-nome"><span>${t.nome}<br><small>${t.desc}</small></span><i class="tema-check" aria-hidden="true"></i></span>
+        </button>`;
+    }).join('');
+    document.querySelectorAll('[data-grade-temas]').forEach(g => g.innerHTML = html);
+}
+
+function abrirTemas() { desenharSeletorTemas(); $('tema-pop').classList.remove('oculto'); $('btn-tema').setAttribute('aria-expanded', 'true'); }
+function fecharTemas() { $('tema-pop').classList.add('oculto'); $('btn-tema').setAttribute('aria-expanded', 'false'); }
+document.addEventListener('click', (e) => {
+    if (e.target.closest('#btn-tema')) { $('tema-pop').classList.contains('oculto') ? abrirTemas() : fecharTemas(); return; }
+    const card = e.target.closest('[data-tema-escolha]');
+    if (card) { escolherTema(card.dataset.temaEscolha); return; }
+    if (e.target.closest('[data-fechar-tema]')) { fecharTemas(); return; }
+    if (!$('tema-pop').classList.contains('oculto') && !e.target.closest('#tema-pop')) fecharTemas();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') fecharTemas(); });
+// modos automáticos: reavaliar quando o aparelho muda de claro/escuro e a cada 5 min (Dia & Noite)
+if (window.matchMedia) matchMedia('(prefers-color-scheme: light)').addEventListener?.('change', () => {
+    if (lerLocal(CHAVE_TEMA, 'noturno') === 'auto') escolherTema('auto');
+});
+setInterval(() => {
+    const esc = lerLocal(CHAVE_TEMA, 'noturno');
+    if (esc === 'diaenoite' && temaEfetivo(esc) !== document.documentElement.getAttribute('data-tema')) escolherTema(esc);
+}, 5 * 60 * 1000);
 const cidsEscopo = () => new Set(filtroCarteira ? [filtroCarteira] : DB.carteiras.map(c => c.id));
 
 // ====================================================================
@@ -753,8 +880,7 @@ function ultimoPrecoConhecido(ticker, ateData) {
 // ====================================================================
 const GRAFICOS = {};
 if (window.Chart) {
-    Chart.defaults.color = '#8B95A3';
-    Chart.defaults.borderColor = '#1D232B';
+    lerCoresDoTema();
     Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
 }
 $('mostrar-zeradas').addEventListener('change', () => renderVisao());
@@ -984,8 +1110,8 @@ function renderVisao() {
             data: {
                 labels: R.rotulos,
                 datasets: [
-                    { label: 'Patrimônio', data: R.vis.map(p => p.ativo ? +p.V.toFixed(2) : null), borderColor: '#5B9DFF', backgroundColor: 'rgba(91,157,255,.12)', fill: true, tension: .25, pointRadius: R.vis.length > 60 ? 0 : 2, borderWidth: 2.2 },
-                    { label: 'Investido', data: R.vis.map(p => p.ativo ? +p.I.toFixed(2) : null), borderColor: '#8B95A3', borderDash: [5, 4], fill: false, stepped: true, pointRadius: 0, borderWidth: 1.5 }
+                    { label: 'Patrimônio', data: R.vis.map(p => p.ativo ? +p.V.toFixed(2) : null), borderColor: TC.azul, backgroundColor: TC.azulA, fill: true, tension: .25, pointRadius: R.vis.length > 60 ? 0 : 2, borderWidth: 2.2 },
+                    { label: 'Investido', data: R.vis.map(p => p.ativo ? +p.I.toFixed(2) : null), borderColor: TC.sutil, borderDash: [5, 4], fill: false, stepped: true, pointRadius: 0, borderWidth: 1.5 }
                 ]
             },
             options: opcoesLinha(brlCurto, R.rotulosLongos, (v) => brl.format(v), false)
@@ -1040,7 +1166,7 @@ function renderVisao() {
             const part = p.qtd > 0 && totCart ? v / totCart * 100 : 0;
             if (p.qtd > 0) { cVal += v; cCusto += p.custo; }
             cProv += p.proventos; cReal += p.realizado;
-            const cor = agruparAloc === 'ativo' ? (cores.get(a?.ticker) || '#5B9DFF') : '#5B9DFF';
+            const cor = agruparAloc === 'ativo' ? (cores.get(a?.ticker) || TC.azul) : TC.azul;
             const alerta = p.alerta ? ' <span class="prejuizo" title="Existe venda maior que a posição — confira as ordens">(!)</span>' : '';
             return `<tr class="${p.qtd === 0 ? 'zerada' : ''}">
                 <td><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(a?.ticker)}">${esc(a?.ticker)}</a></strong><span class="ativo-nome">${esc(a?.nome || '')}</span>${alerta}</td>
@@ -1135,7 +1261,7 @@ function renderEvolucao() {
         data: r.vis.map(p => p.ativo ? +((p.cota / r.cotaBase - 1) * 100).toFixed(2) : null)
     });
     carts.forEach((c, i) => linha(resumoPeriodo(new Set([c.id]), base), c.nome, CORES[i % CORES.length], false));
-    if (carts.length > 1) linha(R, 'Total', '#E6EAF0', true);
+    if (carts.length > 1) linha(R, 'Total', TC.texto, true);
 
     // Ibovespa no mesmo período (fechamentos guardados + agora), para comparar
     const datasVis = base.datas.slice(R.ini);
@@ -1143,7 +1269,7 @@ function renderEvolucao() {
     const ibovBase = (R.ini > 0 ? base.precosPorData.get(base.datas[R.ini - 1])?.[IBOV] : null) ?? ibov.find(v => v != null);
     if (ibovBase && ibov.filter(v => v != null).length >= 2) {
         datasets.push({
-            label: 'Ibovespa', borderColor: '#E8A23A', backgroundColor: '#E8A23A', borderDash: [2, 3], borderWidth: 2,
+            label: 'Ibovespa', borderColor: TC.amarelo, backgroundColor: TC.amarelo, borderDash: [2, 3], borderWidth: 2,
             tension: .25, pointRadius: 0,
             data: ibov.map(v => v != null ? +((v / ibovBase - 1) * 100).toFixed(2) : null)
         });
@@ -1166,7 +1292,7 @@ function renderEvolucao() {
         type: 'bar',
         data: {
             labels: resAtivos.map(x => x[0]),
-            datasets: [{ data: resAtivos.map(x => +x[1].toFixed(2)), backgroundColor: resAtivos.map(x => x[1] >= 0 ? '#3FB97A' : '#F2737B'), borderRadius: 4 }]
+            datasets: [{ data: resAtivos.map(x => +x[1].toFixed(2)), backgroundColor: resAtivos.map(x => x[1] >= 0 ? TC.alta : TC.baixa), borderRadius: 4 }]
         },
         options: {
             indexAxis: 'y', responsive: true, maintainAspectRatio: false,
@@ -1190,7 +1316,7 @@ function renderEvolucao() {
         type: 'bar',
         data: {
             labels: meses.map(m => m.slice(5) + '/' + m.slice(2, 4)),
-            datasets: [{ data: meses.map(m => +porMes[m].toFixed(2)), backgroundColor: '#3FB97A', borderRadius: 4 }]
+            datasets: [{ data: meses.map(m => +porMes[m].toFixed(2)), backgroundColor: TC.alta, borderRadius: 4 }]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
@@ -1262,10 +1388,10 @@ function sparkline(precos, pm, W = 150, H = 34) {
     const y = (v) => H - P - (v - min) / amp * (H - 2 * P);
     const pontos = precos.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
     const ult = precos.at(-1);
-    const cor = ult >= pm ? '#4CC98A' : '#F2737B';
+    const cor = ult >= pm ? TC.alta : TC.baixa;
     const desc = `Preço foi de ${num(precos[0])} para ${num(ult)}; preço médio ${num(pm)}`;
     return `<svg class="spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${desc}">
-        <line x1="${P}" x2="${W - P}" y1="${y(pm).toFixed(1)}" y2="${y(pm).toFixed(1)}" stroke="#8B95A3" stroke-width="1" stroke-dasharray="3 3"></line>
+        <line x1="${P}" x2="${W - P}" y1="${y(pm).toFixed(1)}" y2="${y(pm).toFixed(1)}" stroke="${TC.sutil}" stroke-width="1" stroke-dasharray="3 3"></line>
         <polyline points="${pontos}" fill="none" stroke="${cor}" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"></polyline>
         <circle cx="${x(precos.length - 1).toFixed(1)}" cy="${y(ult).toFixed(1)}" r="2.6" fill="${cor}"></circle>
     </svg>`;
@@ -1307,7 +1433,7 @@ function renderTabelaAtivos(cids, R) {
     const sinal = (v) => (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + num(Math.abs(v));
     $('tb-evol-ativos').innerHTML = linhas.map(l => {
         const larg = Math.min(50, Math.abs(l.rendPct) / maxAbs * 50);
-        const barra = `<span class="rend-barra"><i style="${l.rendPct >= 0 ? 'left:50%' : 'right:50%'};width:${larg.toFixed(1)}%;background:${l.rendPct >= 0 ? '#3FB97A' : '#F2737B'}"></i></span>`;
+        const barra = `<span class="rend-barra"><i style="${l.rendPct >= 0 ? 'left:50%' : 'right:50%'};width:${larg.toFixed(1)}%;background:${l.rendPct >= 0 ? TC.alta : TC.baixa}"></i></span>`;
         return `<tr>
             <td><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(l.ticker)}">${esc(l.ticker)}</a></strong><span class="ativo-nome">${esc(l.a?.nome || '')}</span></td>
             <td class="num">${qtdFmt(l.qtd)}</td>
@@ -1455,7 +1581,7 @@ function renderGraficos() {
     if (mostrarTotalAtivos && medidaAtivos !== 'cotacao') {
         const visiveis = lista.filter(l => !ativosOcultos.has(l.t));
         datasets.push({
-            label: 'Carteira (total)', borderColor: '#E6EAF0', backgroundColor: '#E6EAF0', borderDash: [6, 4], borderWidth: 2.5, tension: .25, pointRadius: 0,
+            label: 'Carteira (total)', borderColor: TC.texto, backgroundColor: TC.texto, borderDash: [6, 4], borderWidth: 2.5, tension: .25, pointRadius: 0,
             data: datas.map((_, k) => {
                 let v = 0, c = 0, tem = false;
                 for (const l of visiveis) { const s = l.serie[k]; if (s) { v += s.valor; c += s.custo; tem = true; } }
@@ -1472,7 +1598,7 @@ function renderGraficos() {
     const opcoes = opcoesLinha(fmt[0], R.rotulosLongos, fmt[1], false);
     opcoes.plugins.tooltip.itemSort = (a, b) => (b.raw ?? -Infinity) - (a.raw ?? -Infinity);
     if (medidaAtivos === 'rent') {
-        opcoes.scales.y.grid = { color: (c) => c.tick?.value === 0 ? '#5A6574' : '#1D232B', lineWidth: (c) => c.tick?.value === 0 ? 1.5 : 1 };
+        opcoes.scales.y.grid = { color: (c) => c.tick?.value === 0 ? TC.bordaForte : TC.linha, lineWidth: (c) => c.tick?.value === 0 ? 1.5 : 1 };
     }
     desenhar('g-ativos', { type: 'line', data: { labels: R.rotulos, datasets }, options: opcoes });
 
@@ -1746,14 +1872,14 @@ function desenharDia(t) {
     const rotulos = pts.map(p => horaSP(p[0]));
     const valores = pts.map(p => +p[1].toFixed(2));
     const sobe = valores.length ? valores[valores.length - 1] >= (anterior ?? valores[0]) : true;
-    const cor = sobe ? '#3FB97A' : '#F2737B';
+    const cor = sobe ? TC.alta : TC.baixa;
     const datasets = [{
         label: 'Preço', data: valores, borderColor: cor, borderWidth: 2.2, tension: .25,
         pointRadius: valores.length > 30 ? 0 : 3, pointHoverRadius: 5, pointBackgroundColor: cor,
-        fill: anterior != null ? { target: { value: anterior }, above: 'rgba(63,185,122,.14)', below: 'rgba(242,115,123,.14)' } : false
+        fill: anterior != null ? { target: { value: anterior }, above: TC.altaA, below: TC.baixaA } : false
     }];
     if (anterior != null && valores.length) datasets.push({
-        label: 'Fechamento anterior', data: valores.map(() => anterior), borderColor: '#8B95A3', borderDash: [5, 4],
+        label: 'Fechamento anterior', data: valores.map(() => anterior), borderColor: TC.sutil, borderDash: [5, 4],
         borderWidth: 1.2, pointRadius: 0, fill: false
     });
     const pmPos = linha && linha.qtd > 0 ? (() => {
@@ -1762,7 +1888,7 @@ function desenharDia(t) {
         return q ? k / q : null;
     })() : null;
     const mostrarPM = pmPos != null && valores.length && Math.abs(pmPos / valores[valores.length - 1] - 1) < 0.08;   // só se estiver perto (senão achata o gráfico)
-    if (mostrarPM) datasets.push({ label: 'Seu preço médio', data: valores.map(() => +pmPos.toFixed(2)), borderColor: '#B58CF0', borderDash: [2, 3], borderWidth: 1.2, pointRadius: 0, fill: false });
+    if (mostrarPM) datasets.push({ label: 'Seu preço médio', data: valores.map(() => +pmPos.toFixed(2)), borderColor: TC.roxo, borderDash: [2, 3], borderWidth: 1.2, pointRadius: 0, fill: false });
 
     const opcoes = opcoesLinha(v => num(v), rotulos, v => brl.format(v), false);
     opcoes.plugins.tooltip.callbacks.label = (ctx) => {
@@ -1932,14 +2058,14 @@ function desenharDetalhe(t, det) {
     const rotulosLongos = datas.map(d => dataBR(d) + (d === hoje && hist.get(d).agora ? ' (cotação atual)' : ''));
     const pts = datas.length > 50 ? 0 : 2;
     const datasets = detMedida === 'preco' ? [
-        { label: 'Fechamento', data: closes, borderColor: '#5B9DFF', backgroundColor: 'rgba(91,157,255,.10)', fill: true, tension: .2, pointRadius: pts, borderWidth: 2 },
-        { label: 'Seu preço médio', data: pmDia.map(v => v != null ? +v.toFixed(2) : null), borderColor: '#A9B2BE', borderDash: [5, 4], stepped: true, pointRadius: 0, borderWidth: 1.5, spanGaps: false }
+        { label: 'Fechamento', data: closes, borderColor: TC.azul, backgroundColor: TC.azulA, fill: true, tension: .2, pointRadius: pts, borderWidth: 2 },
+        { label: 'Seu preço médio', data: pmDia.map(v => v != null ? +v.toFixed(2) : null), borderColor: TC.sutil2, borderDash: [5, 4], stepped: true, pointRadius: 0, borderWidth: 1.5, spanGaps: false }
     ] : [
-        { label: 'Rendimento s/ PM', data: datas.map((d, i) => pmDia[i] ? +((closes[i] / pmDia[i] - 1) * 100).toFixed(2) : null), borderColor: '#5B9DFF', backgroundColor: 'rgba(91,157,255,.10)', fill: true, tension: .2, pointRadius: pts, borderWidth: 2, spanGaps: false }
+        { label: 'Rendimento s/ PM', data: datas.map((d, i) => pmDia[i] ? +((closes[i] / pmDia[i] - 1) * 100).toFixed(2) : null), borderColor: TC.azul, backgroundColor: TC.azulA, fill: true, tension: .2, pointRadius: pts, borderWidth: 2, spanGaps: false }
     ];
     datasets.push(
-        { label: 'Compra', data: marcas.C, textos: textos.C, showLine: false, pointStyle: 'triangle', pointRadius: 8, pointHoverRadius: 10, backgroundColor: '#3FB97A', borderColor: '#0E1116', borderWidth: 1 },
-        { label: 'Venda', data: marcas.V, textos: textos.V, showLine: false, pointStyle: 'triangle', rotation: 180, pointRadius: 8, pointHoverRadius: 10, backgroundColor: '#F2737B', borderColor: '#0E1116', borderWidth: 1 }
+        { label: 'Compra', data: marcas.C, textos: textos.C, showLine: false, pointStyle: 'triangle', pointRadius: 8, pointHoverRadius: 10, backgroundColor: TC.alta, borderColor: TC.fundo, borderWidth: 1 },
+        { label: 'Venda', data: marcas.V, textos: textos.V, showLine: false, pointStyle: 'triangle', rotation: 180, pointRadius: 8, pointHoverRadius: 10, backgroundColor: TC.baixa, borderColor: TC.fundo, borderWidth: 1 }
     );
     const fmtEixo = detMedida === 'preco' ? (v => num(v)) : (v => num(v, 0) + '%');
     const fmtDica = detMedida === 'preco' ? (v => brl.format(v)) : (v => pct(v));
@@ -1949,7 +2075,7 @@ function desenharDetalhe(t, det) {
     opcoes.plugins.tooltip.callbacks.label = (c) => c.dataset.textos
         ? c.dataset.textos[c.dataIndex].map(x => ' ' + x)
         : ` ${c.dataset.label}: ${fmtDica(c.raw)}`;
-    if (detMedida === 'rent') opcoes.scales.y.grid = { color: (c) => c.tick?.value === 0 ? '#5A6574' : '#1D232B' };
+    if (detMedida === 'rent') opcoes.scales.y.grid = { color: (c) => c.tick?.value === 0 ? TC.bordaForte : TC.linha };
     if (window.Chart) desenhar('g-det', { type: 'line', data: { labels: rotulos, datasets }, options: opcoes });
     $('det-graf-titulo').textContent = detMedida === 'preco' ? 'Histórico de preço' : 'Rendimento sobre o seu preço médio';
     const varPer = closes.length > 1 ? (closes.at(-1) / closes[0] - 1) * 100 : null;
@@ -1986,8 +2112,8 @@ function opcoesLinha(fmtEixo, rotulosLongos, fmtDica = fmtEixo, legenda = true) 
         responsive: true, maintainAspectRatio: false, spanGaps: true,
         interaction: { mode: 'index', intersect: false },
         plugins: {
-            legend: { display: legenda, labels: { color: '#A9B2BE', boxWidth: 12, boxHeight: 3 } },
-            tooltip: { backgroundColor: '#11151B', borderColor: '#34404D', borderWidth: 1, padding: 10, callbacks: {
+            legend: { display: legenda, labels: { color: TC.sutil2, boxWidth: 12, boxHeight: 3 } },
+            tooltip: { backgroundColor: TC.topo, borderColor: TC.bordaForte, titleColor: TC.texto, bodyColor: TC.texto, borderWidth: 1, padding: 10, callbacks: {
                 title: (itens) => rotulosLongos[itens[0].dataIndex],
                 label: (c) => ` ${c.dataset.label}: ${c.raw == null ? '—' : fmtDica(c.raw)}`
             } }
@@ -2366,3 +2492,7 @@ $('btn-limpar-cache').addEventListener('click', () => {
     gravarLocal(CHAVE_CACHE, {});
     alert('Cache limpo. Clique em "Atualizar Cotações".');
 });
+
+
+// ---------- temas: monta o seletor na inicialização ----------
+desenharSeletorTemas();

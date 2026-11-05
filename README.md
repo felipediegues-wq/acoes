@@ -90,3 +90,12 @@ Depois abra o site e aperte **Ctrl+F5**.
 - Atualização automática a cada 15 min (`ATUALIZAR_AUTO_MIN` no `config.js`), seg–sex das 10h às 19h30, só com a aba visível.
 - Plano gratuito: 15.000 chamadas/mês, 1 ticker por chamada, cotação com ~30 min de atraso.
   Consumo aproximado: `ativos em posição × 4 por hora × 9,5 h × 22 dias` (10 ativos ≈ 8.400/mês).
+
+## Temas de cor
+
+Botão de paleta no topo (ou Configurações → Aparência): Noturno, Dia, Terminal, Oceano, Canavial,
+Neon, Alto contraste, **Dia & Noite** (claro das 6h às 18h, pelo horário de Brasília) e **Automático**
+(segue o claro/escuro do aparelho). O tema fica salvo no navegador.
+
+As cores ficam em `temas.css` (variáveis CSS). Para criar um tema: copie um bloco `html[data-tema="..."]`,
+ajuste as cores e acrescente o nome na lista `TEMAS` do `app.js`.

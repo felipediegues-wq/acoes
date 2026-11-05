@@ -7,11 +7,22 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=16: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
-    <link rel="stylesheet" href="style.css?v=16">
+    <!-- ?v=18: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <script>
+        // aplica o tema salvo antes de desenhar a página
+        (function () {
+            var t = 'noturno';
+            try { t = JSON.parse(localStorage.getItem('tema_v1')) || 'noturno'; } catch (e) {}
+            if (t === 'auto') t = (window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches) ? 'dia' : 'noturno';
+            if (t === 'diaenoite') { var h = (new Date().getUTCHours() + 21) % 24; t = (h >= 6 && h < 18) ? 'dia' : 'noturno'; }
+            document.documentElement.setAttribute('data-tema', t);
+        })();
+    </script>
+    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="temas.css?v=18">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=16"></script>
+    <script src="config.js?v=18"></script>
 </head>
 <body>
 
@@ -19,7 +30,7 @@
 <div id="tela-login" class="tela-login">
     <form id="form-login" class="painel login-card">
         <div class="marca">
-            <svg width="30" height="30" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6" fill="#1C2A22"></rect><path d="M6 18 L11 12 L15 15 L20 8" stroke="#3FB97A" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            <svg width="30" height="30" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6" style="fill:var(--logo-fundo)"></rect><path d="M6 18 L11 12 L15 15 L20 8" style="stroke:var(--verde)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
             <span>Meus Investimentos</span>
         </div>
         <label>E-mail <input type="email" id="login-email" required autocomplete="username"></label>
@@ -35,7 +46,7 @@
     <header class="topo">
         <div class="topo-in">
             <div class="marca">
-                <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6" fill="#1C2A22"></rect><path d="M6 18 L11 12 L15 15 L20 8" stroke="#3FB97A" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect width="26" height="26" rx="6" style="fill:var(--logo-fundo)"></rect><path d="M6 18 L11 12 L15 15 L20 8" style="stroke:var(--verde)" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"></path></svg>
                 <span>Meus Investimentos</span>
             </div>
             <nav class="nav-principal" aria-label="Principal">
@@ -54,6 +65,9 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 11 A8 8 0 1 0 18 17"></path><path d="M20 4 V11 H13"></path></svg>
                 </button>
                 <button type="button" class="btn so-desktop" data-nova-ordem>+ Nova ordem</button>
+                <button type="button" id="btn-tema" class="btn-icone" aria-label="Mudar as cores (tema)" title="Mudar as cores" aria-expanded="false" aria-controls="tema-pop">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.8 1.7-1.7 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.8-1.7 1.7-1.7H16a5 5 0 0 0 5-5c0-4-4-7.2-9-7.2z"></path><circle cx="7.5" cy="11" r="1.2"></circle><circle cx="10.5" cy="7.2" r="1.2"></circle><circle cx="15" cy="7.4" r="1.2"></circle></svg>
+                </button>
                 <a href="#" data-aba="config" class="btn-icone so-desktop" aria-label="Configurações" title="Configurações">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2 V5 M12 19 V22 M2 12 H5 M19 12 H22 M4.9 4.9 L7 7 M17 17 L19.1 19.1 M4.9 19.1 L7 17 M17 7 L19.1 4.9"></path></svg>
                 </a>
@@ -128,7 +142,7 @@
                     <div class="painel-topo">
                         <h2>Patrimônio x valor investido</h2>
                         <div class="legenda">
-                            <span><i class="leg-linha" style="background:#5B9DFF"></i>Patrimônio</span>
+                            <span><i class="leg-linha" style="background:var(--azul)"></i>Patrimônio</span>
                             <span><i class="leg-tracejado"></i>Investido</span>
                         </div>
                     </div>
@@ -320,9 +334,9 @@
                 <div class="painel-topo">
                     <h2>Hoje</h2>
                     <div class="legenda">
-                        <span><i class="leg-linha" style="background:#3FB97A"></i>Preço</span>
+                        <span><i class="leg-linha" style="background:var(--alta)"></i>Preço</span>
                         <span><i class="leg-tracejado"></i>Fechamento anterior</span>
-                        <span id="dia-ativo-leg-pm"><i class="leg-tracejado" style="border-top-color:#B58CF0"></i>Seu preço médio</span>
+                        <span id="dia-ativo-leg-pm"><i class="leg-tracejado" style="border-top-color:var(--roxo)"></i>Seu preço médio</span>
                     </div>
                 </div>
                 <div id="dia-ativo-numeros" class="dia-ativo-numeros"></div>
@@ -339,7 +353,7 @@
                     </div>
                 </div>
                 <div class="legenda det-legenda">
-                    <span><i class="leg-linha" style="background:#5B9DFF"></i>Fechamento</span>
+                    <span><i class="leg-linha" style="background:var(--azul)"></i>Fechamento</span>
                     <span><i class="leg-tracejado"></i>Seu preço médio</span>
                     <span><i class="marca-ordem compra"></i>Compra</span>
                     <span><i class="marca-ordem venda"></i>Venda</span>
@@ -529,6 +543,10 @@
 
         <!-- ================= CONFIGURAÇÕES ================= -->
         <section id="aba-config" class="aba-conteudo">
+            <section class="painel">
+                <div class="painel-topo"><h2>Aparência</h2><span class="sutil">o tema fica salvo neste aparelho</span></div>
+                <div class="temas-grade" data-grade-temas></div>
+            </section>
             <form id="form-config" class="painel form-grid">
                 <h2>Cotações (brapi.dev)</h2>
                 <label class="largo">Token da brapi
@@ -568,6 +586,16 @@
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7 H20 M4 12 H20 M4 17 H20"></path></svg>Mais</button>
     </nav>
 
+    <div id="tema-pop" class="tema-pop oculto" role="dialog" aria-label="Temas de cor">
+        <div class="painel-topo">
+            <h2>Cores do portal</h2>
+            <button type="button" class="btn-icone" data-fechar-tema aria-label="Fechar">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6 L18 18 M18 6 L6 18"></path></svg>
+            </button>
+        </div>
+        <div class="temas-grade" data-grade-temas></div>
+    </div>
+
     <div id="menu-mais" class="folha oculto">
         <div class="folha-fundo" data-fechar-mais></div>
         <div class="folha-conteudo" role="dialog" aria-label="Mais opções">
@@ -582,6 +610,6 @@
     </div>
 </div>
 
-<script src="app.js?v=16"></script>
+<script src="app.js?v=18"></script>
 </body>
 </html>
