@@ -1251,6 +1251,7 @@ function renderEvolucao() {
           kpi('Proventos no período', brl.format(R.provPeriodo), `${R.vis.length} fechamento(s) no período`);
 
     renderTabelaAtivos(cids, R);
+    renderMensal(cids, base);
 
     // ---------- rentabilidade acumulada por carteira ----------
     const carts = DB.carteiras.filter(c => cids.has(c.id));
@@ -1371,6 +1372,174 @@ function renderQuadroDia(D, suf = '') {
 
     const c0 = D.linhas.map(l => l.c?.mercado || l.c?.em).filter(Boolean);
     $$('dia-info').textContent = c0.length ? `cotações buscadas às ${horaSP(Math.min(...D.linhas.map(l => l.c?.em).filter(Boolean)))} · atraso de ~30 min (brapi gratuita)` : '';
+}
+
+
+// ====================================================================
+// EVOLUÇÃO MENSAL
+//  Usa todos os fechamentos gravados (+ "Agora"), sem o filtro de período:
+//   rent. do mês  = cota no fim do mês / cota no fim do mês anterior − 1 (método de cotas)
+//   resultado R$  = patrimônio fim − patrimônio início − compras + vendas + proventos
+//   Ibovespa      = índice no último fechamento do mês / último do mês anterior − 1
+// ====================================================================
+const NOMES_MES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+const rotMes = (m) => `${NOMES_MES[Number(m.slice(5, 7)) - 1]}/${m.slice(2, 4)}`;
+
+function calcularMeses(cids, base) {
+    const serie = montarSerie(cids, base.datas, base.precosPorData, base.posPorData);
+    const dataReal = (d) => d === 'AGORA' ? hojeSP() : d;
+    const fimDoMes = new Map();   // yyyy-mm -> índice do último ponto do mês
+    serie.forEach((p, i) => { if (p.ativo) fimDoMes.set(dataReal(p.data).slice(0, 7), i); });
+    const meses = [];
+    let ant = null;
+    for (const [mes, i] of fimDoMes) {
+        const p = serie[i], dFim = dataReal(p.data), dIni = ant ? dataReal(ant.p.data) : null;
+        const { aportes, resgates } = fluxoEntre(cids, dIni, dFim);
+        const prov = proventosEntre(cids, dIni, dFim);
+        const vIni = ant ? ant.p.V : 0;
+        const ibF = base.precosPorData.get(p.data)?.[IBOV], ibI = ant ? base.precosPorData.get(ant.p.data)?.[IBOV] : null;
+        meses.push({
+            mes, ultimo: p.data === 'AGORA', vIni, vFim: p.V, investido: p.I, aportes, resgates, prov,
+            resultado: p.V - vIni - aportes + resgates + prov,
+            rent: (p.cota / (ant ? ant.p.cota : 1) - 1) * 100,
+            acum: (p.cota - 1) * 100,
+            ibov: ibF && ibI ? (ibF / ibI - 1) * 100 : null
+        });
+        ant = { p };
+    }
+    // Ibovespa acumulado (desde o primeiro mês com índice)
+    let fat = 1, tem = false;
+    for (const m of meses) { if (m.ibov != null) { fat *= 1 + m.ibov / 100; tem = true; } m.ibovAcum = tem ? (fat - 1) * 100 : null; }
+    return meses;
+}
+
+function renderMensal(cids, base) {
+    const todos = calcularMeses(cids, base);
+    const celular = window.matchMedia('(max-width: 760px)').matches;
+    const meses = todos.slice(-(celular ? 12 : 24));
+    const rot = meses.map(m => rotMes(m.mes) + (m.ultimo ? '*' : ''));
+
+    // ---------- rentabilidade por mês ----------
+    desenhar('g-mensal-rent', {
+        type: 'bar',
+        data: { labels: rot, datasets: [
+            { type: 'line', label: 'Acumulado', data: meses.map(m => +m.acum.toFixed(2)), borderColor: TC.azul, backgroundColor: TC.azul,
+              borderWidth: 2, cubicInterpolationMode: 'monotone', pointRadius: 3, yAxisID: 'y', order: 0 },
+            { label: 'Carteira', data: meses.map(m => +m.rent.toFixed(2)), backgroundColor: meses.map(m => m.rent >= 0 ? TC.alta : TC.baixa),
+              borderRadius: 4, maxBarThickness: 38, order: 1 },
+            { label: 'Ibovespa', data: meses.map(m => m.ibov != null ? +m.ibov.toFixed(2) : null), backgroundColor: hexParaRgba(TC.amarelo, .75),
+              borderRadius: 4, maxBarThickness: 22, order: 2 }
+        ] },
+        options: {
+            responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: TC.topo, borderColor: TC.bordaForte, borderWidth: 1, titleColor: TC.texto, bodyColor: TC.texto,
+                callbacks: { title: (it) => { const m = meses[it[0].dataIndex]; return rotMes(m.mes) + (m.ultimo ? ' (até agora)' : ''); },
+                             label: (c) => c.raw == null ? null : ` ${c.dataset.label}: ${pct(c.raw)}` } } },
+            scales: { x: { grid: { display: false } },
+                      y: { ticks: { callback: v => num(v, 0) + '%' }, grid: { color: (c) => c.tick?.value === 0 ? TC.bordaForte : TC.linha } } }
+        }
+    });
+    const pos = meses.filter(m => m.rent > 0).length, neg = meses.filter(m => m.rent < 0).length;
+    const melhor = meses.reduce((x, m) => !x || m.rent > x.rent ? m : x, null), pior = meses.reduce((x, m) => !x || m.rent < x.rent ? m : x, null);
+    const venceu = meses.filter(m => m.ibov != null && m.rent > m.ibov).length, comIb = meses.filter(m => m.ibov != null).length;
+    $('mensal-nota').innerHTML = !meses.length ? 'Ainda não há fechamentos gravados.' :
+        `${meses.length} ${meses.length > 1 ? 'meses' : 'mês'}: ${pos} positivo(s), ${neg} negativo(s)` +
+        (melhor ? ` · melhor <span class="lucro">${rotMes(melhor.mes)} ${pct(melhor.rent)}</span>` : '') +
+        (pior && pior !== melhor ? ` · pior <span class="${classe(pior.rent)}">${rotMes(pior.mes)} ${pct(pior.rent)}</span>` : '') +
+        (comIb ? ` · bateu o Ibovespa em ${venceu} de ${comIb}` : '') +
+        (meses.some(m => m.ultimo) ? ' · * mês atual, até agora' : '') +
+        '. Os meses começam a contar a partir dos fechamentos gravados pelo portal.';
+
+    // ---------- patrimônio no fim do mês ----------
+    desenhar('g-mensal-pat', {
+        type: 'bar',
+        data: { labels: rot, datasets: [
+            { type: 'line', label: 'Investido', data: meses.map(m => +m.investido.toFixed(2)), borderColor: TC.sutil, borderDash: [5, 4],
+              borderWidth: 1.5, stepped: 'middle', pointRadius: 0, order: 0 },
+            { label: 'Patrimônio', data: meses.map(m => +m.vFim.toFixed(2)), backgroundColor: hexParaRgba(TC.azul, .8), borderRadius: 4, maxBarThickness: 40, order: 1 },
+            { label: 'Compras − vendas', data: meses.map(m => +(m.aportes - m.resgates).toFixed(2)), backgroundColor: hexParaRgba(TC.alta, .55), borderRadius: 4, maxBarThickness: 18, order: 2 }
+        ] },
+        options: {
+            responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom', labels: { color: TC.sutil2, boxWidth: 12, boxHeight: 8 } },
+                       tooltip: { backgroundColor: TC.topo, borderColor: TC.bordaForte, borderWidth: 1, titleColor: TC.texto, bodyColor: TC.texto,
+                                  callbacks: { label: (c) => ` ${c.dataset.label}: ${brl.format(c.raw)}` } } },
+            scales: { x: { grid: { display: false } }, y: { ticks: { callback: brlCurto } } }
+        }
+    });
+
+    // ---------- resultado em R$ ----------
+    desenhar('g-mensal-res', {
+        type: 'bar',
+        data: { labels: rot, datasets: [
+            { label: 'Resultado', data: meses.map(m => +m.resultado.toFixed(2)), backgroundColor: meses.map(m => m.resultado >= 0 ? TC.alta : TC.baixa), borderRadius: 4, maxBarThickness: 40 },
+            { label: 'Proventos', data: meses.map(m => +m.prov.toFixed(2)), backgroundColor: hexParaRgba(TC.roxo, .8), borderRadius: 4, maxBarThickness: 16 }
+        ] },
+        options: {
+            responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom', labels: { color: TC.sutil2, boxWidth: 12, boxHeight: 8 } },
+                       tooltip: { backgroundColor: TC.topo, borderColor: TC.bordaForte, borderWidth: 1, titleColor: TC.texto, bodyColor: TC.texto,
+                                  callbacks: { label: (c) => ` ${c.dataset.label}: ${sinalBrl(c.raw)}` } } },
+            scales: { x: { grid: { display: false } }, y: { ticks: { callback: brlCurto }, grid: { color: (c) => c.tick?.value === 0 ? TC.bordaForte : TC.linha } } }
+        }
+    });
+
+    // ---------- tabela ----------
+    const sn = (v) => (v > 0.004 ? '+' : v < -0.004 ? '−' : '') + num(Math.abs(v));
+    $('tb-mensal').innerHTML = [...todos].reverse().map(m => `<tr>
+        <td><strong>${rotMes(m.mes)}</strong>${m.ultimo ? '<span class="sutil">*</span><span class="sutil so-larga"> (até agora)</span>' : ''}</td>
+        <td class="num col-opc">${num(m.vIni)}</td>
+        <td class="num col-opc">${m.aportes ? num(m.aportes) : '—'}</td>
+        <td class="num col-opc">${m.resgates ? num(m.resgates) : '—'}</td>
+        <td class="num col-opc">${m.prov ? num(m.prov) : '—'}</td>
+        <td class="num col-opc">${num(m.vFim)}</td>
+        <td class="num ${classe(m.resultado)}">${sn(m.resultado)}</td>
+        <td class="num ${classe(m.rent)}">${pct(m.rent)}</td>
+        <td class="num ${classe(m.ibov)}">${m.ibov != null ? pct(m.ibov) : '—'}</td>
+        <td class="num col-opc ${classe(m.acum)}">${pct(m.acum)}</td>
+    </tr>`).join('') || '<tr><td colspan="10" class="vazio">Ainda não há fechamentos gravados.</td></tr>';
+    const tRes = todos.reduce((s, m) => s + m.resultado, 0), tProv = todos.reduce((s, m) => s + m.prov, 0);
+    const ult = todos[todos.length - 1];
+    $('tf-mensal').innerHTML = todos.length ? `<tr>
+        <td>Total</td><td class="col-opc"></td>
+        <td class="num col-opc">${num(todos.reduce((s, m) => s + m.aportes, 0))}</td>
+        <td class="num col-opc">${num(todos.reduce((s, m) => s + m.resgates, 0))}</td>
+        <td class="num col-opc">${num(tProv)}</td><td class="num col-opc">${num(ult.vFim)}</td>
+        <td class="num ${classe(tRes)}">${sn(tRes)}</td>
+        <td class="num ${classe(ult.acum)}">${pct(ult.acum)}</td>
+        <td class="num ${classe(ult.ibovAcum)}">${ult.ibovAcum != null ? pct(ult.ibovAcum) : '—'}</td><td class="col-opc"></td>
+    </tr>` : '';
+
+    // ---------- mapa de calor: variação do preço de cada ativo em cada mês ----------
+    const mesesMapa = todos.slice(-(celular ? 4 : 12));
+    const dataReal = (d) => d === 'AGORA' ? hojeSP() : d;
+    const fimMes = new Map();
+    for (const d of base.datas) fimMes.set(dataReal(d).slice(0, 7), d);
+    const chaves = [...fimMes.keys()];
+    const ativosMapa = new Set();
+    for (const d of base.datas) for (const p of base.posPorData.get(d).values()) if (cids.has(p.carteira_id) && p.qtd > 0) ativosMapa.add(normTicker(ativoDe(p.ativo_id)?.ticker));
+    const lista = [...ativosMapa].filter(Boolean).sort();
+    const linhasMapa = lista.map(t => {
+        const cels = mesesMapa.map(m => {
+            const k = chaves.indexOf(m.mes);
+            const pf = base.precosPorData.get(fimMes.get(m.mes))?.[t];
+            const pi = k > 0 ? base.precosPorData.get(fimMes.get(chaves[k - 1]))?.[t] : null;
+            return pf != null && pi != null ? (pf / pi - 1) * 100 : null;
+        });
+        return { t, cels };
+    });
+    const maxAbs = Math.max(5, ...linhasMapa.flatMap(l => l.cels.filter(v => v != null).map(Math.abs)));
+    const celula = (v) => {
+        if (v == null) return '<td class="num mc-vazio">—</td>';
+        const forca = Math.min(1, Math.abs(v) / maxAbs);
+        const fundo = hexParaRgba(v >= 0 ? TC.alta : TC.baixa, (0.12 + forca * 0.6).toFixed(2));
+        return `<td class="num mc" style="background:${fundo}" title="${pct(v)}">${pct(v)}</td>`;
+    };
+    $('mapa-calor').innerHTML = !linhasMapa.length || !mesesMapa.length ? '<tbody><tr><td class="vazio">Sem dados ainda.</td></tr></tbody>' :
+        `<thead><tr><th>Ativo</th>${mesesMapa.map(m => `<th class="num">${rotMes(m.mes)}${m.ultimo ? '*' : ''}</th>`).join('')}</tr></thead>
+         <tbody>${linhasMapa.map(l => `<tr><td><strong><a href="#" class="link-ativo" data-ver-ativo="${esc(l.t)}">${esc(l.t)}</a></strong></td>${l.cels.map(celula).join('')}</tr>`).join('')}
+         <tr class="mc-carteira"><td><strong>Carteira</strong></td>${mesesMapa.map(m => celula(m.rent)).join('')}</tr>
+         <tr class="mc-carteira"><td><strong>Ibovespa</strong></td>${mesesMapa.map(m => celula(m.ibov)).join('')}</tr></tbody>`;
 }
 
 // ====================================================================

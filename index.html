@@ -7,7 +7,7 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=18: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <!-- ?v=19: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
     <script>
         // aplica o tema salvo antes de desenhar a página
         (function () {
@@ -18,11 +18,11 @@
             document.documentElement.setAttribute('data-tema', t);
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=18">
-    <link rel="stylesheet" href="temas.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="stylesheet" href="temas.css?v=19">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=18"></script>
+    <script src="config.js?v=19"></script>
 </head>
 <body>
 
@@ -208,6 +208,48 @@
             <section class="m-bloco so-celular">
                 <span class="m-titulo">Hoje</span>
                 <div id="m-dia" class="painel" style="padding:4px 14px"></div>
+            </section>
+
+            <!-- ================= EVOLUÇÃO MENSAL ================= -->
+            <section class="painel">
+                <div class="painel-topo">
+                    <h2>Rentabilidade por mês</h2>
+                    <div class="legenda">
+                        <span><i class="leg-bloco" style="background:var(--alta)"></i><i class="leg-bloco" style="background:var(--baixa)"></i>Carteira</span>
+                        <span><i class="leg-bloco" style="background:var(--amarelo)"></i>Ibovespa</span>
+                        <span><i class="leg-linha" style="background:var(--azul)"></i>Acumulado</span>
+                    </div>
+                </div>
+                <div class="canvas-box alto"><canvas id="g-mensal-rent" role="img" aria-label="Gráfico de barras da rentabilidade de cada mês comparada ao Ibovespa, com a linha do acumulado"></canvas></div>
+                <p id="mensal-nota" class="sutil nota-grafico"></p>
+            </section>
+            <div class="graficos">
+                <section class="painel">
+                    <div class="painel-topo"><h2>Patrimônio no fim de cada mês</h2></div>
+                    <div class="canvas-box"><canvas id="g-mensal-pat" role="img" aria-label="Gráfico do patrimônio no fim de cada mês, valor investido e aportes"></canvas></div>
+                </section>
+                <section class="painel">
+                    <div class="painel-topo"><h2>Resultado do mês (R$)</h2></div>
+                    <div class="canvas-box"><canvas id="g-mensal-res" role="img" aria-label="Gráfico do resultado em reais de cada mês"></canvas></div>
+                </section>
+            </div>
+            <section class="painel sem-padding">
+                <div class="painel-topo com-padding"><h2>Mês a mês</h2><span class="sutil">resultado = variação do patrimônio − aportes + vendas + proventos</span></div>
+                <div class="tabela-wrap">
+                    <table class="dados tabela-mensal">
+                        <thead><tr>
+                            <th>Mês</th><th class="num col-opc">Patrimônio início</th><th class="num col-opc">Compras</th><th class="num col-opc">Vendas</th>
+                            <th class="num col-opc">Proventos</th><th class="num col-opc">Patrimônio fim</th><th class="num">Resultado</th>
+                            <th class="num">Rent.</th><th class="num">Ibov</th><th class="num col-opc">Acumulado</th>
+                        </tr></thead>
+                        <tbody id="tb-mensal"></tbody>
+                        <tfoot id="tf-mensal"></tfoot>
+                    </table>
+                </div>
+            </section>
+            <section class="painel sem-padding">
+                <div class="painel-topo com-padding"><h2>Mapa de calor — variação do preço de cada ativo no mês</h2></div>
+                <div class="tabela-wrap"><table class="dados mapa-calor" id="mapa-calor"></table></div>
             </section>
 
             <!-- celular: um cartão por ativo (sem rolar para o lado) -->
@@ -610,6 +652,6 @@
     </div>
 </div>
 
-<script src="app.js?v=18"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>
