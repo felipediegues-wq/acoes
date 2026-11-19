@@ -7,7 +7,7 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=20: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <!-- ?v=21: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
     <script>
         // aplica o tema salvo antes de desenhar a página
         (function () {
@@ -18,11 +18,11 @@
             document.documentElement.setAttribute('data-tema', t);
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=20">
-    <link rel="stylesheet" href="temas.css?v=20">
+    <link rel="stylesheet" href="style.css?v=21">
+    <link rel="stylesheet" href="temas.css?v=21">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=20"></script>
+    <script src="config.js?v=21"></script>
 </head>
 <body>
 
@@ -119,21 +119,26 @@
             </section>
 
 
-            <section id="painel-mercado" class="painel mercado">
-                <div class="painel-topo">
-                    <h2>Mercado hoje</h2>
-                    <span id="mercado-info" class="sutil"></span>
+            <section id="m-carteiras" class="m-bloco so-celular"></section>
+            <section id="m-posicoes" class="m-bloco so-celular"></section>
+
+            <section class="painel sem-padding so-desktop">
+                <div class="painel-topo com-padding">
+                    <h2>Carteira</h2>
+                    <div class="painel-acoes">
+                        <label class="check"><input type="checkbox" id="mostrar-zeradas"> Mostrar zeradas</label>
+                        <label class="inline">Buscar <input type="search" id="busca-posicao" placeholder="ticker ou nome"></label>
+                    </div>
                 </div>
-                <div class="mercado-grid">
-                    <div id="ibov-box" class="ibov-box"></div>
-                    <div class="mov-col">
-                        <h3>Maiores altas do Ibovespa</h3>
-                        <div id="lista-altas" class="mov-lista"></div>
-                    </div>
-                    <div class="mov-col">
-                        <h3>Maiores baixas do Ibovespa</h3>
-                        <div id="lista-baixas" class="mov-lista"></div>
-                    </div>
+                <div class="tabela-wrap">
+                    <table class="dados tabela-posicoes">
+                        <thead><tr>
+                            <th>Ativo</th><th class="num">Quant.</th><th class="num">Preço médio</th><th class="num">Cotação</th>
+                            <th class="num">Dia</th><th class="num">Valor</th><th class="num">Resultado</th><th class="num">Rent.</th>
+                            <th class="num col-pct">% carteira</th><th class="num">Proventos</th><th class="num">Realizado</th>
+                        </tr></thead>
+                        <tbody id="tb-posicao"></tbody>
+                    </table>
                 </div>
             </section>
 
@@ -163,26 +168,21 @@
                 </section>
             </div>
 
-            <section id="m-carteiras" class="m-bloco so-celular"></section>
-            <section id="m-posicoes" class="m-bloco so-celular"></section>
-
-            <section class="painel sem-padding so-desktop">
-                <div class="painel-topo com-padding">
-                    <h2>Posições</h2>
-                    <div class="painel-acoes">
-                        <label class="check"><input type="checkbox" id="mostrar-zeradas"> Mostrar zeradas</label>
-                        <label class="inline">Buscar <input type="search" id="busca-posicao" placeholder="ticker ou nome"></label>
-                    </div>
+            <section id="painel-mercado" class="painel mercado">
+                <div class="painel-topo">
+                    <h2>Mercado hoje</h2>
+                    <span id="mercado-info" class="sutil"></span>
                 </div>
-                <div class="tabela-wrap">
-                    <table class="dados tabela-posicoes">
-                        <thead><tr>
-                            <th>Ativo</th><th class="num">Quant.</th><th class="num">Preço médio</th><th class="num">Cotação</th>
-                            <th class="num">Dia</th><th class="num">Valor</th><th class="num">Resultado</th><th class="num">Rent.</th>
-                            <th class="num col-pct">% carteira</th><th class="num">Proventos</th><th class="num">Realizado</th>
-                        </tr></thead>
-                        <tbody id="tb-posicao"></tbody>
-                    </table>
+                <div class="mercado-grid">
+                    <div id="ibov-box" class="ibov-box"></div>
+                    <div class="mov-col">
+                        <h3>Maiores altas do Ibovespa</h3>
+                        <div id="lista-altas" class="mov-lista"></div>
+                    </div>
+                    <div class="mov-col">
+                        <h3>Maiores baixas do Ibovespa</h3>
+                        <div id="lista-baixas" class="mov-lista"></div>
+                    </div>
                 </div>
             </section>
         </section>
@@ -652,6 +652,6 @@
     </div>
 </div>
 
-<script src="app.js?v=20"></script>
+<script src="app.js?v=21"></script>
 </body>
 </html>

@@ -317,13 +317,14 @@ table.dados tfoot td .sutil { font-weight: 400; }
 
     /* ordem dos blocos da Visão geral no celular: patrimônio, gráfico, carteiras, posições, alocação */
     .linha-graficos { display: contents; }
+    /* celular: patrimônio, hoje, carteiras, posições, gráfico, alocação, mercado */
     #m-hero { order: 1; }
     #m-dia-bloco-v { order: 2; }
-    .grafico-principal { order: 2; }
     #m-carteiras { order: 3; }
     #m-posicoes { order: 4; }
-    .mercado { order: 5; }
+    .grafico-principal { order: 5; }
     .alocacao { order: 6; }
+    .mercado { order: 7; }
     .mercado-grid { grid-template-columns: minmax(0, 1fr); gap: 18px; }
     .ibov-topo { display: none; }
     .grafico-principal, .alocacao { flex: none; }
