@@ -1054,6 +1054,23 @@ function dadosDoDia(cids) {
              altas: linhas.filter(l => l.resultado > 0).length, baixas: linhas.filter(l => l.resultado < 0).length };
 }
 
+// quadro do Ibovespa nos números do topo: pontos, variação do dia e a carteira contra o índice
+function kpiIbov(D) {
+    const c = COTACOES[IBOV];
+    if (!c) return kpi('Ibovespa', '—', ibovIndisponivel ? 'indisponível na brapi' : 'carregando…');
+    if (cotacaoDeOntem(IBOV)) return kpi('Ibovespa', '—', `${num(c.preco, 0)} pts · ainda o fechamento de ontem`);
+    const carteiraOk = D.pct != null && !(D.deOntem && D.deOntem + D.semDado >= D.linhas.length);
+    let sub = `${num(c.preco, 0)} pts`;
+    if (carteiraOk) {
+        const dif = D.pct - c.variacao;
+        sub += ` · <span style="white-space:nowrap">carteira <span class="${classe(dif)}">${Math.abs(dif) < 0.005 ? 'empatada' : (dif > 0 ? '▲ ' : '▼ ') + num(Math.abs(dif)) + ' p.p.'}</span></span>`;
+    }
+    return `<div class="kpi" title="Ibovespa: ${num(c.preco, 0)} pts${c.anterior ? ' · fechamento anterior ' + num(c.anterior, 0) + ' pts' : ''}${carteiraOk ? ' · carteira hoje ' + pct(D.pct) + ' (p.p. = diferença em pontos percentuais entre a sua carteira e o índice)' : ''}">
+        <span class="rotulo">Ibovespa</span>
+        <span class="valor ${classe(c.variacao)}">${seta(c.variacao)}${pct(c.variacao)}</span>
+        <span class="sub">${sub}</span></div>`;
+}
+
 function kpiHoje(D) {
     if (!D.linhas.length) return kpi('Hoje', '—', 'sem posições');
     if (D.deOntem && D.deOntem + D.semDado >= D.linhas.length) return kpi('Hoje', '—', 'pregão de hoje ainda não chegou (atraso da brapi)');
@@ -1086,6 +1103,7 @@ function renderVisao() {
         kpi('Patrimônio', brl.format(valor), `investido ${brl.format(custo)}${parcial ? ' · cotação parcial' : ''}`) +
         kpi('Resultado em aberto', sinalBrl(res), `${seta(res)}${pct(resPct)} sobre o custo`, classe(res), classe(res)) +
         kpiHoje(DIA) +
+        kpiIbov(DIA) +
         kpi('Rentabilidade', R.rent != null ? pct(R.rent) : '—',
             R.inicio ? `desde ${dataBR(R.inicio === 'AGORA' ? hojeSP() : R.inicio)} · método de cotas` : 'sem fechamentos no período', classe(R.rent)) +
         kpi(periodoDias ? 'Proventos no período' : 'Proventos', brl.format(periodoDias ? R.provPeriodo : prov),

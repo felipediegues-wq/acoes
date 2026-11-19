@@ -111,6 +111,7 @@ a { color: var(--sutil2); }
 .kpi .rotulo { color: var(--sutil); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
 .kpi .valor { font-family: var(--mono); font-size: 24px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .kpi .sub { color: var(--sutil); font-size: 13px; }
+.kpi .kpi-var { font-size: 15px; margin-left: 4px; }
 
 /* ---------------- Gráfico + alocação ---------------- */
 .linha-graficos { display: flex; flex-wrap: wrap; gap: 22px; }
