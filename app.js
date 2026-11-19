@@ -2007,7 +2007,7 @@ function desenharDia(t) {
     // ---------- pontos ----------
     const bra = INTRADIA[t];
     let pts, fonte;
-    if (bra?.pts) { pts = bra.pts.slice(); fonte = 'brapi, a cada 5 min'; }
+    if (bra?.pts) { pts = bra.pts.slice(); fonte = 'brapi, um ponto a cada 5 min (a máxima e a mínima do dia podem ter acontecido entre dois pontos)'; }
     else {
         pts = pontosRegistrados(t).slice();
         fonte = 'registrado pelo portal a cada busca de cotação (o gráfico vai se formando ao longo do dia)';
@@ -2079,8 +2079,19 @@ function desenharDetalhe(t, det) {
     const a = DB.ativos.find(x => x.ticker === t);
     const r = det?.r || {};
     const cot = COTACOES[t];
-    const preco = r.regularMarketPrice != null ? Number(r.regularMarketPrice) : cot?.preco ?? null;
-    const varDia = r.regularMarketChangePercent != null ? Number(r.regularMarketChangePercent) : cot?.variacao ?? null;
+    // UMA fonte para todos os números do dia: a cotação mais recente (COTACOES é atualizada
+    // pela busca automática e também pela consulta do detalhe). Os dados de r só entram se faltar.
+    const rNum = (v) => v != null && isFinite(Number(v)) ? Number(v) : null;
+    const preco = cot?.preco ?? rNum(r.regularMarketPrice);
+    const varDia = cot?.variacao ?? rNum(r.regularMarketChangePercent);
+    const dia = {
+        anterior: cot?.anterior ?? rNum(r.regularMarketPreviousClose),
+        abertura: cot?.abertura ?? rNum(r.regularMarketOpen),
+        maxima: cot?.maxima ?? rNum(r.regularMarketDayHigh),
+        minima: cot?.minima ?? rNum(r.regularMarketDayLow),
+        volume: cot?.volume ?? rNum(r.regularMarketVolume),
+        hora: cot?.mercado || cot?.em || tempoMs(r.regularMarketTime)
+    };
     const nome = r.longName || r.shortName || a?.nome || '';
     const n = (v, dec = 2) => v == null || !isFinite(v) ? '—' : num(v, dec);
 
@@ -2105,7 +2116,7 @@ function desenharDetalhe(t, det) {
             ${deOntem ? '<span class="tag-ontem">fechamento de ontem</span>' : ''}
         </div>
         <span class="sutil">${deOntem ? 'o preço de hoje ainda não chegou na brapi (atraso de ~30 min no plano gratuito)'
-            : r.regularMarketTime || cot?.mercado ? 'dado da brapi de ' + horaSP(tempoMs(r.regularMarketTime) || cot.mercado) + ' · plano gratuito com ~30 min de atraso' : det ? '' : 'carregando…'}</span>`;
+            : dia.hora ? 'dado da brapi de ' + horaSP(dia.hora) + ' · plano gratuito com ~30 min de atraso' : det ? '' : 'carregando…'}</span>`;
 
     // ---------- dados de mercado ----------
     const min52 = r.fiftyTwoWeekLow, max52 = r.fiftyTwoWeekHigh;
@@ -2114,12 +2125,12 @@ function desenharDetalhe(t, det) {
     $('det-mercado').innerHTML = `
         <div class="painel-topo"><h2>Informações de mercado</h2></div>
         <div class="det-grade">
-            ${item('Abertura', n(r.regularMarketOpen))}
-            ${item('Fech. anterior', n(r.regularMarketPreviousClose ?? cot?.anterior))}
-            ${item('Máxima do dia', n(r.regularMarketDayHigh))}
-            ${item('Mínima do dia', n(r.regularMarketDayLow))}
-            ${item('Volume (qtd)', r.regularMarketVolume ? Number(r.regularMarketVolume).toLocaleString('pt-BR') : '—')}
-            ${item('Volume (R$)', r.regularMarketVolume && preco ? bilhoes(r.regularMarketVolume * preco) : '—')}
+            ${item('Abertura', n(dia.abertura))}
+            ${item('Fech. anterior', n(dia.anterior))}
+            ${item('Máxima do dia', n(dia.maxima))}
+            ${item('Mínima do dia', n(dia.minima))}
+            ${item('Volume (qtd)', dia.volume ? Number(dia.volume).toLocaleString('pt-BR') : '—')}
+            ${item('Volume (R$)', dia.volume && preco ? bilhoes(dia.volume * preco) : '—')}
             ${item('Valor de mercado', r.marketCap ? bilhoes(Number(r.marketCap)) : '—')}
             ${item('P/L', n(r.priceEarnings))}
             ${item('LPA', n(r.earningsPerShare))}
@@ -2161,8 +2172,8 @@ function desenharDetalhe(t, det) {
     const hoje = hojeSP();
     if (preco != null) {
         const h = hist.get(hoje) || {};
-        hist.set(hoje, { ...h, close: preco, open: r.regularMarketOpen ?? h.open, high: r.regularMarketDayHigh ?? h.high,
-                         low: r.regularMarketDayLow ?? h.low, vol: r.regularMarketVolume ?? h.vol, agora: true });
+        hist.set(hoje, { ...h, close: preco, open: dia.abertura ?? h.open, high: dia.maxima ?? h.high,
+                         low: dia.minima ?? h.low, vol: dia.volume ?? h.vol, agora: true });
     }
     let datas = [...hist.keys()].sort();
     if (periodoDias > 0) { const corte = somaDias(hoje, -periodoDias); datas = datas.filter(d => d >= corte); }
