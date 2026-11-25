@@ -7,7 +7,7 @@
     <title>Meus Investimentos</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-    <!-- ?v=22: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
+    <!-- ?v=23: número da versão — obriga o celular a baixar os arquivos novos em vez de usar os guardados -->
     <script>
         // aplica o tema salvo antes de desenhar a página
         (function () {
@@ -18,11 +18,11 @@
             document.documentElement.setAttribute('data-tema', t);
         })();
     </script>
-    <link rel="stylesheet" href="style.css?v=22">
-    <link rel="stylesheet" href="temas.css?v=22">
+    <link rel="stylesheet" href="style.css?v=23">
+    <link rel="stylesheet" href="temas.css?v=23">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
-    <script src="config.js?v=22"></script>
+    <script src="config.js?v=23"></script>
 </head>
 <body>
 
@@ -210,6 +210,57 @@
                 <div id="m-dia" class="painel" style="padding:4px 14px"></div>
             </section>
 
+            <!-- celular: um cartão por ativo (sem rolar para o lado) -->
+            <section class="m-bloco so-celular">
+                <div class="m-cab">
+                    <span class="m-titulo">Ativos</span>
+                    <label class="inline m-ordem">Ordenar
+                        <select id="ordem-ativos-cel">
+                            <option value="valor|desc">Maior valor</option>
+                            <option value="rendPct|desc">Maior rendimento</option>
+                            <option value="rendPct|asc">Menor rendimento</option>
+                            <option value="dia|desc">Maior alta no dia</option>
+                            <option value="dia|asc">Maior baixa no dia</option>
+                            <option value="ticker|asc">Ticker (A–Z)</option>
+                        </select>
+                    </label>
+                </div>
+                <div id="m-evol-ativos"></div>
+                <div class="rodape-carteira m-rodape">
+                    <span class="sutil">Carteira:</span>
+                    <div class="segmentado mini seg-cart-ativos" role="group" aria-label="Carteira da tabela de ativos"></div>
+                </div>
+            </section>
+
+            <section class="painel sem-padding so-desktop">
+                <div class="painel-topo com-padding">
+                    <h2>Ativos</h2>
+                    <span class="sutil dica-ordenar">Clique no título da coluna para ordenar · rendimento calculado sobre o preço médio das ordens</span>
+                </div>
+                <div class="tabela-wrap">
+                    <table class="dados tabela-ativos">
+                        <thead><tr>
+                            <th data-ordenar="ticker" class="ordenavel">Ativo</th>
+                            <th data-ordenar="qtd" class="num ordenavel">Quant.</th>
+                            <th data-ordenar="pm" class="num ordenavel">Preço médio</th>
+                            <th data-ordenar="custo" class="num ordenavel">Investido</th>
+                            <th data-ordenar="cotacao" class="num ordenavel">Cotação</th>
+                            <th data-ordenar="dia" class="num ordenavel">Dia</th>
+                            <th data-ordenar="valor" class="num ordenavel">Valor atual</th>
+                            <th data-ordenar="rend" class="num ordenavel">Rendimento</th>
+                            <th data-ordenar="rendPct" class="num ordenavel">Rend. %</th>
+                            <th class="col-evol">Evolução x preço médio</th>
+                        </tr></thead>
+                        <tbody id="tb-evol-ativos"></tbody>
+                        <tfoot id="tf-evol-ativos"></tfoot>
+                    </table>
+                </div>
+                <div class="rodape-carteira">
+                    <span class="sutil">Carteira:</span>
+                    <div class="segmentado mini seg-cart-ativos" role="group" aria-label="Carteira da tabela de ativos"></div>
+                </div>
+            </section>
+
             <!-- ================= EVOLUÇÃO MENSAL ================= -->
             <section class="painel">
                 <div class="painel-topo">
@@ -252,48 +303,6 @@
                 <div class="tabela-wrap"><table class="dados mapa-calor" id="mapa-calor"></table></div>
             </section>
 
-            <!-- celular: um cartão por ativo (sem rolar para o lado) -->
-            <section class="m-bloco so-celular">
-                <div class="m-cab">
-                    <span class="m-titulo">Ativos</span>
-                    <label class="inline m-ordem">Ordenar
-                        <select id="ordem-ativos-cel">
-                            <option value="valor|desc">Maior valor</option>
-                            <option value="rendPct|desc">Maior rendimento</option>
-                            <option value="rendPct|asc">Menor rendimento</option>
-                            <option value="dia|desc">Maior alta no dia</option>
-                            <option value="dia|asc">Maior baixa no dia</option>
-                            <option value="ticker|asc">Ticker (A–Z)</option>
-                        </select>
-                    </label>
-                </div>
-                <div id="m-evol-ativos"></div>
-            </section>
-
-            <section class="painel sem-padding so-desktop">
-                <div class="painel-topo com-padding">
-                    <h2>Ativos</h2>
-                    <span class="sutil dica-ordenar">Clique no título da coluna para ordenar · rendimento calculado sobre o preço médio das ordens</span>
-                </div>
-                <div class="tabela-wrap">
-                    <table class="dados tabela-ativos">
-                        <thead><tr>
-                            <th data-ordenar="ticker" class="ordenavel">Ativo</th>
-                            <th data-ordenar="qtd" class="num ordenavel">Quant.</th>
-                            <th data-ordenar="pm" class="num ordenavel">Preço médio</th>
-                            <th data-ordenar="custo" class="num ordenavel">Investido</th>
-                            <th data-ordenar="cotacao" class="num ordenavel">Cotação</th>
-                            <th data-ordenar="dia" class="num ordenavel">Dia</th>
-                            <th data-ordenar="valor" class="num ordenavel">Valor atual</th>
-                            <th data-ordenar="rend" class="num ordenavel">Rendimento</th>
-                            <th data-ordenar="rendPct" class="num ordenavel">Rend. %</th>
-                            <th class="col-evol">Evolução x preço médio</th>
-                        </tr></thead>
-                        <tbody id="tb-evol-ativos"></tbody>
-                        <tfoot id="tf-evol-ativos"></tfoot>
-                    </table>
-                </div>
-            </section>
 
 
             <div class="graficos">
@@ -652,6 +661,6 @@
     </div>
 </div>
 
-<script src="app.js?v=22"></script>
+<script src="app.js?v=23"></script>
 </body>
 </html>

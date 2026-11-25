@@ -1268,7 +1268,8 @@ function renderEvolucao() {
               R.inicio ? `desde ${dataBR(R.inicio === 'AGORA' ? hojeSP() : R.inicio)}` : '', classe(R.rent)) +
           kpi('Proventos no período', brl.format(R.provPeriodo), `${R.vis.length} fechamento(s) no período`);
 
-    renderTabelaAtivos(cids, R);
+    renderTabelaAtivos(cidsTabelaAtivos(cids), R);
+    desenharRodapeCarteira(cids);
     renderMensal(cids, base);
 
     // ---------- rentabilidade acumulada por carteira ----------
@@ -1559,6 +1560,26 @@ function renderMensal(cids, base) {
          <tr class="mc-carteira"><td><strong>Carteira</strong></td>${mesesMapa.map(m => celula(m.rent)).join('')}</tr>
          <tr class="mc-carteira"><td><strong>Ibovespa</strong></td>${mesesMapa.map(m => celula(m.ibov)).join('')}</tr></tbody>`;
 }
+
+// ---------- filtro de carteira no rodapé da tabela de ativos ----------
+// null = segue o filtro do topo; '' = todas; id = só aquela carteira
+let filtroTabAtivos = null;
+function cidsTabelaAtivos(cidsTopo) {
+    if (filtroTabAtivos === null) return cidsTopo;
+    return new Set(filtroTabAtivos ? [filtroTabAtivos] : DB.carteiras.map(c => c.id));
+}
+function desenharRodapeCarteira(cidsTopo) {
+    if (filtroTabAtivos && !DB.carteiras.some(c => c.id === filtroTabAtivos)) filtroTabAtivos = null;
+    const efetivo = filtroTabAtivos !== null ? filtroTabAtivos : (cidsTopo.size === 1 && DB.carteiras.length > 1 ? [...cidsTopo][0] : '');
+    const op = [{ id: '', nome: 'Todas' }, ...DB.carteiras];
+    const html = op.map(c => `<button type="button" data-cart-ativos="${c.id}" class="${c.id === efetivo ? 'ativo' : ''}" aria-pressed="${c.id === efetivo}">${esc(c.nome)}</button>`).join('');
+    document.querySelectorAll('.seg-cart-ativos').forEach(el => el.innerHTML = html);
+}
+document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cart-ativos]');
+    if (b) { filtroTabAtivos = b.dataset.cartAtivos; renderEvolucao(); return; }
+    if (e.target.closest('[data-carteira-filtro]')) filtroTabAtivos = null;   // trocou o filtro do topo: a tabela volta a seguir o topo
+}, true);
 
 // ====================================================================
 // EVOLUÇÃO: tabela de ativos (soma o mesmo ativo das carteiras filtradas)
